@@ -2,6 +2,9 @@
   "name": "brank",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,6 +13,8 @@
     "test:inferhence": "bun test packages/inferhence/test"
   },
   "dependencies": {
+    "@brank/inferhence": "workspace:*",
+    "@brank/providers": "workspace:*",
     "@ai-sdk/openai": "^4.0.16",
     "@ai-sdk/openai-compatible": "^3.0.12",
     "@base-ui/react": "^1.6.0",

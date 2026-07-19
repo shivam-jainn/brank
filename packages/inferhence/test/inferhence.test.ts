@@ -10,6 +10,7 @@ import {
   redactPreview,
   retryTransport,
   withInference,
+  withReadableStreamingInference,
   withStreamingInference,
 } from "../src";
 
@@ -156,6 +157,40 @@ describe("events and wrappers", () => {
     expect(transport.events.map((event) => event.eventType)).toEqual([
       "started",
       "first_token",
+      "completed",
+    ]);
+  });
+
+  test("wraps readable streams without losing stream compatibility", async () => {
+    const transport = createMemoryTransport();
+    const stream = withReadableStreamingInference("input", () => new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue("hello ");
+        controller.enqueue("world");
+        controller.close();
+      },
+    }), {
+      metadata,
+      transport,
+      progress: { chunkCount: 2 },
+      clock: clockFactory(1_000, 1_001, 1_002, 1_003, 1_100),
+      idFactory: () => "id",
+    });
+
+    const reader = stream.getReader();
+    const chunks: string[] = [];
+
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      chunks.push(next.value);
+    }
+
+    expect(chunks.join("")).toBe("hello world");
+    expect(transport.events.map((event) => event.eventType)).toEqual([
+      "started",
+      "first_token",
+      "progress",
       "completed",
     ]);
   });

@@ -106,7 +106,11 @@ export function retryTransport(
 export function bufferedTransport(
   transport: InferenceTransport,
   options: { capacity?: number; overflow?: "drop_oldest" | "drop_newest" | "throw" } = {},
-): InferenceTransport & { size(): number } {
+): InferenceTransport & {
+  flush(): Promise<void>;
+  close(): Promise<void>;
+  size(): number;
+} {
   const capacity = options.capacity ?? 1000;
   const overflow = options.overflow ?? "drop_oldest";
   const queue: InferenceEvent[] = [];

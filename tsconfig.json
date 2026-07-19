@@ -19,7 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@brank/inferhence": ["./packages/inferhence/src/index.ts"],
+      "@brank/providers": ["./packages/providers/registry.ts"],
+      "@brank/providers/*": ["./packages/providers/*"]
     }
   },
   "include": [

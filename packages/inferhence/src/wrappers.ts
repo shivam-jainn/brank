@@ -119,6 +119,38 @@ export async function* withStreamingInference<TChunk>(
   }
 }
 
+export function withReadableStreamingInference<TChunk>(
+  input: unknown,
+  streamFactory: (signal?: AbortSignal) => ReadableStream<TChunk>,
+  options: WrapperOptions & {
+    chunkToText?: (chunk: TChunk) => string;
+    usageFromChunk?: (chunk: TChunk) => TokenUsage | undefined;
+  },
+): ReadableStream<TChunk> {
+  const iterable = withStreamingInference(
+    input,
+    (signal) => readableStreamToAsyncIterable(streamFactory(signal)),
+    options,
+  );
+  const iterator = iterable[Symbol.asyncIterator]();
+
+  return new ReadableStream<TChunk>({
+    async pull(controller) {
+      const next = await iterator.next();
+      if (next.done) {
+        controller.close();
+        return;
+      }
+
+      controller.enqueue(next.value);
+    },
+    async cancel(reason) {
+      await iterator.throw?.(reason);
+      await iterator.return?.();
+    },
+  });
+}
+
 function normalizeCompletionResult<T>(result: T | CompletionResult<T>): CompletionResult<T> {
   if (
     result &&
@@ -129,6 +161,25 @@ function normalizeCompletionResult<T>(result: T | CompletionResult<T>): Completi
   }
 
   return { response: result as T, output: result };
+}
+
+async function* readableStreamToAsyncIterable<TChunk>(
+  stream: ReadableStream<TChunk>,
+): AsyncIterable<TChunk> {
+  const reader = stream.getReader();
+
+  try {
+    while (true) {
+      const next = await reader.read();
+      if (next.done) {
+        return;
+      }
+
+      yield next.value;
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 function isAbortError(error: unknown): boolean {

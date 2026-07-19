@@ -1,4 +1,4 @@
-import { registry } from "@/packages/providers/registry";
+import { registry } from "@brank/providers";
 import { withLogging } from "@/lib/logger";
 
 export const GET = withLogging(async function GET() {
