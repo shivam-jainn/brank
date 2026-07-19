@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.agents
+*.tsbuildinfo
+dist
+out
+build
+tmp
+*.log
