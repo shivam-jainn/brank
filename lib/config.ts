@@ -11,6 +11,8 @@ export const appConfig = {
     githubClientSecret: process.env.GITHUB_CLIENT_SECRET,
   },
   databaseUrl: normalizeLocalServiceUrl(process.env.DATABASE_URL),
+  rabbitmqUrl: process.env.RABBITMQ_URL,
+  redisUrl: process.env.REDIS_URL,
   inference: {
     ingestUrl: process.env.INFERHENCE_INGEST_URL ?? "http://localhost:3000/api/ingest",
     ingestHeaders: process.env.INFERHENCE_INGEST_HEADERS,

@@ -1,0 +1,90 @@
+---
+# Next.js Application Deployment — producer-only mode when RABBITMQ_URL is set
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brank-app
+  namespace: default
+  labels:
+    app: brank
+    component: app
+spec:
+  replicas: 2          # scale horizontally; the queue decouples writes
+  selector:
+    matchLabels:
+      app: brank
+      component: app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: brank
+        component: app
+    spec:
+      containers:
+        - name: app
+          image: brank:latest
+          imagePullPolicy: IfNotPresent
+          command: ["bun", "run", "start"]
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: brank-secrets
+          env:
+            # Override DATABASE_URL to use the in-cluster Postgres service
+            - name: DATABASE_URL
+              value: postgresql://brank:brank@postgres:5432/brank
+            # Override RABBITMQ_URL to use in-cluster RabbitMQ service
+            - name: RABBITMQ_URL
+              value: amqp://brank:brank@rabbitmq:5672
+            # Override REDIS_URL to use in-cluster Redis service
+            - name: REDIS_URL
+              value: redis://redis:6379
+            - name: INFERHENCE_INGEST_URL
+              value: http://brank-app:3000/api/ingest
+            - name: NODE_ENV
+              value: production
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 4
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+
+---
+# App Service (ClusterIP — fronted by Ingress)
+apiVersion: v1
+kind: Service
+metadata:
+  name: brank-app
+  namespace: default
+  labels:
+    app: brank
+    component: app
+spec:
+  selector:
+    app: brank
+    component: app
+  ports:
+    - port: 3000
+      targetPort: 3000
+  type: ClusterIP

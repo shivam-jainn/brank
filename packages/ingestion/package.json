@@ -4,7 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./queue-adapter": "./src/queue-adapter.ts",
+    "./rabbitmq": "./src/rabbitmq.ts",
+    "./metrics-aggregator": "./src/metrics-aggregator.ts"
   },
   "scripts": {
     "test": "bun test"

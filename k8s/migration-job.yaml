@@ -1,0 +1,32 @@
+---
+# One-shot Job — runs Prisma migrations before the app starts.
+# Use `kubectl wait --for=condition=complete job/db-migrate` in your
+# deployment script or CI pipeline before applying app.yaml.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+  namespace: default
+  labels:
+    app: brank
+    component: migration
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: brank
+        component: migration
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: brank:latest          # same image as the app
+          imagePullPolicy: IfNotPresent
+          command: ["bun", "run", "db:migrate"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: brank-secrets
+                  key: DATABASE_URL

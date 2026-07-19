@@ -1,0 +1,36 @@
+---
+# Nginx Ingress — API Gateway / Load Balancer
+#
+# Prerequisites:
+#   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+#
+# Or for a cloud cluster use the cloud-specific ingress controller.
+#
+# Local DNS:
+#   Add to /etc/hosts:  127.0.0.1  brank.local
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: brank-ingress
+  namespace: default
+  labels:
+    app: brank
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    # Enable SSE (long-lived connections) — disable buffering
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: brank.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: brank-app
+                port:
+                  number: 3000

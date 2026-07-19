@@ -1,0 +1,27 @@
+---
+# Kustomize root — ties all manifests together.
+#
+# Apply everything at once:
+#   kubectl apply -k k8s/
+#
+# Deployment order:
+#   1. secrets.yaml      — credentials (must be applied manually first with real values)
+#   2. postgres.yaml     — database
+#   3. redis.yaml        — chat cache
+#   4. rabbitmq.yaml     — event queue
+#   5. migration-job.yaml — schema migration (wait for completion before proceeding)
+#   6. app.yaml          — Next.js producer
+#   7. worker.yaml       — ingestion consumer
+#   8. ingress.yaml      — API gateway / LB
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - secrets.yaml
+  - postgres.yaml
+  - redis.yaml
+  - rabbitmq.yaml
+  - migration-job.yaml
+  - app.yaml
+  - worker.yaml
+  - ingress.yaml

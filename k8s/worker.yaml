@@ -1,0 +1,78 @@
+---
+# Ingestion Worker Deployment — consumer-only process
+#
+# Consumes inference events from RabbitMQ and writes them to Postgres in
+# micro-batches.  Runs the standalone worker script:
+#   packages/ingestion/src/worker.ts
+#
+# Scaling:
+#   Increase `replicas` to fan out consumption.  Each worker pod opens its
+#   own channel and amqplib distributes messages round-robin across channels.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brank-worker
+  namespace: default
+  labels:
+    app: brank
+    component: worker
+spec:
+  replicas: 1          # increase for higher throughput
+  selector:
+    matchLabels:
+      app: brank
+      component: worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: brank
+        component: worker
+    spec:
+      terminationGracePeriodSeconds: 60   # give the worker time to drain
+      containers:
+        - name: worker
+          image: brank:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - bun
+            - packages/ingestion/src/worker.ts
+          envFrom:
+            - secretRef:
+                name: brank-secrets
+          env:
+            - name: DATABASE_URL
+              value: postgresql://brank:brank@postgres:5432/brank
+            - name: RABBITMQ_URL
+              value: amqp://brank:brank@rabbitmq:5672
+            - name: RABBITMQ_QUEUE
+              value: brank.inference.events
+            - name: RABBITMQ_DLQ
+              value: brank.inference.dlq
+            - name: RABBITMQ_PREFETCH
+              value: "50"
+            - name: INGESTION_MAX_BATCH_SIZE
+              value: "100"
+            - name: INGESTION_MAX_BATCH_WAIT_MS
+              value: "250"
+            - name: INGESTION_MAX_RETRIES
+              value: "3"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          # Workers are long-lived processes — no HTTP probe needed.
+          # Use exec probe to verify the process is alive.
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "ps aux | grep -v grep | grep worker.ts"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3

@@ -1,5 +1,6 @@
 import type { UIMessage } from "ai";
 import { Prisma, getPrismaClient } from "@/lib/db";
+import { invalidateConversationCache } from "@/lib/chat-cache";
 
 type PersistChatRequestOptions = {
   conversationId: string;
@@ -61,6 +62,9 @@ export async function persistChatRequest({
       messages,
     });
   });
+
+  // Invalidate Redis cache so next read reflects the new messages.
+  await invalidateConversationCache(conversationId);
 }
 
 export async function persistChatResponse({
@@ -99,6 +103,9 @@ export async function persistChatResponse({
       messages: [message],
     });
   });
+
+  // Invalidate Redis cache so next read reflects the new assistant message.
+  await invalidateConversationCache(conversationId);
 }
 
 async function appendChatMessages(

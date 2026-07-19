@@ -4,23 +4,45 @@ Lightweight LLM chat app plus inference logging pipeline. The app streams model 
 
 ## What Is Done
 
-Done: multi-provider registry, streaming chat, short multi-turn context, inference SDK/wrapper, near real-time ingestion endpoint, event based micro-batch pipeline, Prisma/Postgres storage, PII redaction, conversation list/resume/cancel UI, metrics dashboard, `.env.example`, and Docker Compose one-command setup.
+- Multi-provider registry + streaming chat + short multi-turn context
+- `@brank/inferhence` SDK — auto-instruments LLM calls with latency, token usage, timestamps, status, IDs, and PII-redacted previews
+- Pluggable queue **adapter pattern** — swap between in-memory (dev), RabbitMQ, or Kafka with one config change
+- Standalone **ingestion worker** — consumes RabbitMQ, micro-batch writes to Postgres, graceful SIGTERM drain
+- **Redis cache** — chat history/messages cached with TTL, invalidated on every write
+- **Composable rolling metrics aggregator** — `MetricsBackend` interface makes swapping to ClickHouse a one-liner
+- Prisma/Postgres storage — Conversation, ChatMessage, InferenceEvent, ExtractedMetadata
+- PII redaction at both SDK and ingestion boundary
+- Conversation list / resume / cancel UI
+- Metrics SSE dashboard — latency, throughput, errors, queue health
+- Docker Compose one-command setup (`docker-compose up --build`)
+- Kubernetes manifests (`k8s/`) — Postgres, Redis, RabbitMQ, App, Worker, Ingress, migration Job
+- `.env.example` with all knobs documented
 
-Not done: a separate self-hosted Kubernetes manifest. The app is containerized and ready to be deployed to k8s, but manifests/Helm were not added in this pass.
+Not done: a live self-hosted k8s cluster deployment (manifests are ready, requires a cluster with an nginx ingress controller).
 
-Build note: Next.js is configured with `typescript.ignoreBuildErrors` because the bundled ai-elements template contains unrelated type errors outside the implemented app path. The inference SDK and ingestion packages have passing tests.
-
-## Setup
+## Quick Start (Docker Compose)
 
 ```bash
 cp .env.example .env
-# add at least one provider key, for example OPENAI_API_KEY
+# Fill in at least one provider key (OPENAI_API_KEY or GROQ_API_KEY)
 docker-compose up --build
 ```
 
 Open `http://localhost:3000`.
 
-For local development without Docker:
+The `docker-compose up` command starts:
+| Service | Role |
+|---------|------|
+| `postgres` | Database |
+| `redis` | Chat cache |
+| `rabbitmq` | Persistent event queue |
+| `migrate` | One-shot Prisma migration job |
+| `app` | Next.js (producer-only, sends events to RabbitMQ) |
+| `worker` | Ingestion consumer (drains RabbitMQ → Postgres) |
+
+RabbitMQ management UI: `http://localhost:15672` (user: `brank`, pass: `brank`)
+
+## Local Development (No Docker)
 
 ```bash
 bun install
@@ -29,62 +51,138 @@ bun run db:migrate
 bun run dev
 ```
 
-## Config
+Without `RABBITMQ_URL` the app uses an in-process memory queue and runs the consumer inside the Next.js process — no external broker required for local development.
 
-All common knobs are visible in `.env.example`.
-
-Required for full logging:
+## Kubernetes Deployment
 
 ```bash
-DATABASE_URL=postgresql://brank:brank@localhost:5432/brank
-INFERHENCE_INGEST_URL=http://localhost:3000/api/ingest
+# 1. Build and push the image
+docker build -t brank:latest .
+# docker tag brank:latest <registry>/brank:latest && docker push <registry>/brank:latest
+
+# 2. Fill in secrets (base64 encode each value)
+cp k8s/secrets.yaml k8s/secrets.local.yaml
+# Edit k8s/secrets.local.yaml with your values
+kubectl apply -f k8s/secrets.local.yaml
+
+# 3. Apply everything else
+kubectl apply -k k8s/
+
+# 4. Wait for migration to complete before routing traffic
+kubectl wait --for=condition=complete job/db-migrate --timeout=120s
 ```
 
-Provider configuration:
+Add `127.0.0.1  brank.local` to `/etc/hosts` then open `http://brank.local`.
 
+The ingress requires an nginx ingress controller:
 ```bash
-OPENAI_API_KEY=
-GROQ_API_KEY=
-LMSTUDIO_BASE_URL=http://localhost:1234/v1
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 ```
 
-Ingestion tuning:
+## Environment Variables
 
-```bash
-INGESTION_MAX_BATCH_SIZE=100
-INGESTION_MAX_BATCH_WAIT_MS=250
-INGESTION_MAX_RETRIES=3
-INGESTION_QUEUE_CAPACITY=10000
-```
+All knobs are documented in `.env.example`. Key variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | — | Postgres connection string |
+| `RABBITMQ_URL` | (unset) | If set, uses RabbitMQ; otherwise in-memory queue |
+| `REDIS_URL` | (unset) | If set, enables Redis chat cache |
+| `REDIS_CHAT_TTL_S` | `300` | Cache TTL in seconds |
+| `INGESTION_MAX_BATCH_SIZE` | `100` | Worker micro-batch size |
+| `INGESTION_MAX_BATCH_WAIT_MS` | `250` | Worker flush interval |
+| `INGESTION_MAX_RETRIES` | `3` | Dead-letter after N retries |
 
 ## Architecture
 
-The chatbot calls the Vercel AI SDK with a provider-qualified model ID such as `openai:gpt-4.1` or `groq:llama-3.3-70b-versatile`. `@brank/providers` owns provider discovery and model registry setup.
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Browser                                                          │
+│  ┌─────────────────┐   SSE    ┌──────────────────────────────┐  │
+│  │  Chat UI        │◄────────►│  Next.js App (producer)      │  │
+│  │  Dashboard      │          │  /api/chat   /api/metrics     │  │
+│  └─────────────────┘          │  /api/ingest (← SDK logs)    │  │
+└──────────────────────────────└──────────────┬───────────────────┘
+                                               │ AMQP publish
+                                               ▼
+                                    ┌─────────────────┐
+                                    │   RabbitMQ      │  ← Broker Adapter
+                                    │  (persistent)   │    (Kafka-ready)
+                                    └────────┬────────┘
+                                             │ consume
+                                             ▼
+                                    ┌─────────────────┐
+                                    │  Worker         │
+                                    │  micro-batch    │
+                                    │  → Postgres     │
+                                    └─────────────────┘
 
-`@brank/inferhence` wraps LLM calls. For streaming calls it emits `started`, `first_token`, `progress`, `completed`, `failed`, or `cancelled` events with provider, model, latency, token usage, timestamps, status, IDs, and redacted input/output previews.
+  Redis ──► chat message cache (TTL invalidation on write)
 
-`POST /api/ingest` receives SDK events, validates and normalizes them, redacts previews again at the ingestion boundary, queues them, and micro-batches writes to Postgres through Prisma.
+  MetricsAggregator (composable backend)
+    ├── InMemoryMetricsBackend  (current)
+    └── ClickHouseMetricsBackend (future — implement MetricsBackend interface)
+```
 
-`GET /api/metrics` returns latency, throughput, error counts, and pipeline health for the dashboard. `GET /api/conversations` powers conversation list/resume.
+`@brank/inferhence` wraps LLM calls and emits `started`, `first_token`, `progress`, `completed`, `failed`, `cancelled` events to `POST /api/ingest`.
+
+`/api/ingest` validates, redacts, and publishes to the queue adapter.
+
+The worker subscribes, micro-batches, and bulk-inserts to Postgres via `createPrismaEventStore`.
 
 ## Schema
 
-`Conversation` stores session-level grouping and title.
+| Table | Purpose |
+|-------|---------|
+| `Conversation` | Session grouping and title |
+| `ChatMessage` | User/assistant messages with sequence, provider, model |
+| `InferenceEvent` | Append-only telemetry — event type, latency, tokens, previews |
+| `ExtractedMetadata` | Flexible namespace/key/value for future extraction without schema changes |
 
-`ChatMessage` stores user/assistant/tool messages, sequence, provider/model, request ID, trace ID, and original UI parts.
+## Queue Adapter Pattern
 
-`InferenceEvent` stores append-only inference telemetry: event type, status, provider, model, operation, timestamps, latency, tokens, redacted previews, errors, raw event, queue timestamps, and attempts.
+```ts
+// Memory (dev / tests)
+createQueueAdapter({ type: "memory" })
 
-`ExtractedMetadata` is a flexible namespace/key/value table for future extraction jobs without forcing schema changes for every new metric.
+// RabbitMQ (current production)
+createQueueAdapter({ type: "rabbitmq", channel, queueName: "brank.inference.events" })
+
+// Kafka (future — add createKafkaEventQueue and a new case here)
+createQueueAdapter({ type: "kafka", producer, topic: "inference-events" })
+```
+
+## Composable Metrics Aggregator
+
+```ts
+// Current: in-memory rolling buckets
+const backend = createInMemoryMetricsBackend({ bucketWidthMs: 60_000, maxBuckets: 60 });
+const aggregator = createMetricsAggregator(backend);
+
+// Future: swap to ClickHouse by implementing MetricsBackend
+const clickhouseBackend = createClickHouseMetricsBackend(chClient);
+const aggregator = createMetricsAggregator(clickhouseBackend);
+```
 
 ## Tradeoffs
 
-The ingestion queue is in-process for simplicity, but the pipeline interface supports swapping in RabbitMQ or another broker. Telemetry delivery is best-effort with retries so chat UX is not blocked by transient ingestion failures. Preview redaction is regex/key based, which is fast and transparent, but a production system should add provider-side moderation/classification or DLP checks for higher recall.
+- Queue is in-process by default (dev), swappable to RabbitMQ/Kafka via env var — no code changes.
+- Redis cache is opt-in; the app works identically without it.
+- Telemetry delivery is best-effort with retries — chat UX is never blocked by transient ingestion failures.
+- PII redaction is regex/key-based (fast, transparent) — a production system should add DLP classification.
+- Metrics aggregator is in-memory per process — aggregate across replicas by summing backends or using a shared ClickHouse table.
 
-## Scaling Notes
+## Scaling
 
-Run multiple app replicas behind a load balancer, keep Postgres as the source of truth, and move the queue to RabbitMQ/Kafka/SQS when ingestion volume exceeds what one process can buffer. Add indexes by dashboard query pattern, partition `InferenceEvent` by time at higher volume, and export metrics to Prometheus/Grafana for production dashboards.
+- Scale `brank-app` replicas horizontally; RabbitMQ decouples write pressure.
+- Scale `brank-worker` replicas for higher ingestion throughput.
+- Move Redis to a Redis Cluster / Elasticache for multi-replica cache consistency.
+- Swap `InMemoryMetricsBackend` → `ClickHouseMetricsBackend` when dashboard query volume grows.
+- Partition `InferenceEvent` by time at high volume.
 
 ## Failure Handling
 
-The SDK retries HTTP delivery and then drops telemetry rather than failing user chat requests. The ingestion consumer retries failed batches up to `INGESTION_MAX_RETRIES`; after that, failures are counted and the message is nacked without requeue. Events use `eventId` as the DB primary key with duplicate skipping for idempotency.
+- The SDK retries HTTP delivery `INFERHENCE_RETRIES` times then drops telemetry (chat never blocked).
+- The worker retries failed batches up to `INGESTION_MAX_RETRIES`; after that, messages are nacked to the DLQ.
+- Events use `eventId` as the DB primary key with `skipDuplicates` for idempotency.
+- `terminationGracePeriodSeconds: 60` on the worker pod ensures in-flight batches finish before eviction.
