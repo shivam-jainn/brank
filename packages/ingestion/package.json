@@ -1,0 +1,15 @@
+{
+  "name": "@brank/ingestion",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@brank/inferhence": "workspace:*"
+  }
+}

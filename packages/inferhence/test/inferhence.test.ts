@@ -12,6 +12,7 @@ import {
   withInference,
   withReadableStreamingInference,
   withStreamingInference,
+  wrapLanguageModel,
 } from "../src";
 
 const metadata = {
@@ -370,3 +371,57 @@ describe("transports", () => {
     expect(batches).toEqual([["started", "progress"]]);
   });
 });
+
+describe("wrapLanguageModel", () => {
+  test("auto-instruments doGenerate and doStream", async () => {
+    const transport = createMemoryTransport();
+    const mockModel = {
+      modelId: "mock-model",
+      provider: "mock-provider",
+      async doGenerate(options: any) {
+        return {
+          text: "hello world generated",
+          usage: { promptTokens: 5, completionTokens: 10 },
+        };
+      },
+      async doStream(options: any) {
+        return {
+          stream: new ReadableStream({
+            start(controller) {
+              controller.enqueue({ type: "text-delta", textDelta: "hello " });
+              controller.enqueue({ type: "text-delta", textDelta: "world " });
+              controller.enqueue({
+                type: "response-metadata",
+                usage: { promptTokens: 5, completionTokens: 10 },
+              });
+              controller.close();
+            },
+          }),
+        };
+      },
+    };
+
+    const wrapped = wrapLanguageModel(mockModel, {
+      metadata: {
+        provider: "mock-provider",
+        model: "mock-model",
+      },
+      transport,
+    });
+
+    const genResult = await wrapped.doGenerate({ prompt: "hi" });
+    expect(genResult.text).toBe("hello world generated");
+
+    const streamResult = await wrapped.doStream({ prompt: "hi stream" });
+    const reader = streamResult.stream.getReader();
+    while (true) {
+      const { done } = await reader.read();
+      if (done) break;
+    }
+
+    const eventTypes = transport.events.map((e) => e.eventType);
+    expect(eventTypes).toContain("started");
+    expect(eventTypes).toContain("completed");
+  });
+});
+

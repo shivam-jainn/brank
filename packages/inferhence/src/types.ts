@@ -15,6 +15,7 @@ export type TokenUsage = {
   input?: number;
   output?: number;
   total?: number;
+  estimated?: boolean;
 };
 
 export type InferenceIds = {

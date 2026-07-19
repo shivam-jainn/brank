@@ -1,33 +1,38 @@
 import {
     createHttpTransport,
-    createMemoryTransport,
     type InferenceTransport,
     type TokenUsage,
 } from '@brank/inferhence';
+import { appConfig } from '@/lib/config';
 
 type AiSdkUsage = {
     inputTokens?: number;
     outputTokens?: number;
     totalTokens?: number;
+    estimated?: boolean;
 };
 
 let sharedTransport: InferenceTransport | undefined;
+let sharedEndpoint: string | undefined;
 
-export function getInferenceTransport(): InferenceTransport {
-    if (sharedTransport) {
+export function getInferenceTransport(endpointOverride?: string): InferenceTransport {
+    const endpoint = endpointOverride ?? appConfig.inference.ingestUrl;
+
+    if (sharedTransport && sharedEndpoint === endpoint) {
         return sharedTransport;
     }
 
-    const endpoint = process.env.INFERHENCE_INGEST_URL;
+    if (!endpoint) {
+        throw new Error('INFERHENCE_INGEST_URL is required for inference logging.');
+    }
 
-    sharedTransport = endpoint
-        ? createHttpTransport({
+    sharedEndpoint = endpoint;
+    sharedTransport = createHttpTransport({
             endpoint,
-            headers: parseHeaders(process.env.INFERHENCE_INGEST_HEADERS),
-            timeoutMs: readNumber(process.env.INFERHENCE_TIMEOUT_MS, 5_000),
-            retries: readNumber(process.env.INFERHENCE_RETRIES, 2),
-        })
-        : createMemoryTransport();
+            headers: parseHeaders(appConfig.inference.ingestHeaders),
+            timeoutMs: appConfig.inference.timeoutMs,
+            retries: appConfig.inference.retries,
+        });
 
     return sharedTransport;
 }
@@ -41,6 +46,7 @@ export function usageFromAiSdk(usage: AiSdkUsage | undefined): TokenUsage | unde
         input: usage.inputTokens,
         output: usage.outputTokens,
         total: usage.totalTokens,
+        estimated: usage.estimated,
     };
 }
 
@@ -63,13 +69,4 @@ function parseHeaders(value: string | undefined): Record<string, string> | undef
     } catch {
         return undefined;
     }
-}
-
-function readNumber(value: string | undefined, fallback: number): number {
-    if (!value) {
-        return fallback;
-    }
-
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
 }
