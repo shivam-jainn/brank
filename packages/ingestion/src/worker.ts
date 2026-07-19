@@ -18,6 +18,8 @@
  */
 
 import amqplib from "amqplib";
+import pg from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../../../app/generated/prisma/client";
 import { createRabbitMqEventQueue } from "./rabbitmq";
 import { createPrismaEventStore } from "./prisma-store";
@@ -60,7 +62,10 @@ async function main() {
   const channel = await connection.createChannel();
   console.info("[worker] connected to RabbitMQ");
 
-  const prisma = new PrismaClient();
+  const dbUrl = readEnv("DATABASE_URL");
+  const pgPool = new pg.Pool({ connectionString: dbUrl });
+  const adapter = new PrismaPg(pgPool);
+  const prisma = new PrismaClient({ adapter });
   const store = createPrismaEventStore(prisma);
   const queue = createRabbitMqEventQueue({
     // RabbitMQ channel satisfies RabbitMqChannel without casting because
@@ -95,6 +100,7 @@ async function main() {
       await channel.close();
       await connection.close();
       await prisma.$disconnect();
+      await pgPool.end();
       console.info("[worker] shutdown complete");
       process.exit(0);
     } catch (error) {
