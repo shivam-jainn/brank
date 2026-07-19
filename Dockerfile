@@ -8,12 +8,16 @@ RUN bun install --frozen-lockfile
 
 FROM deps AS builder
 WORKDIR /app
+# OpenSSL is required by Prisma to detect the correct binary target
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN bun run prisma:generate
-RUN bun run build
+# Unset NODE_ENV during build so Next.js doesn't complain about non-standard values
+RUN NODE_ENV=production bun run build
 
 FROM oven/bun:1.2 AS runner
 WORKDIR /app
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 COPY --from=builder /app .
 EXPOSE 3000
