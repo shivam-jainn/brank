@@ -64,13 +64,18 @@ import {
 } from "@/components/ai-elements/sources";
 import { SpeechInput } from "@/components/ai-elements/speech-input";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
-import type { ToolUIPart } from "ai";
+import { readUIMessageStream, parseJsonEventStream, uiMessageChunkSchema, type ToolUIPart } from "ai";
 import { CheckIcon, GlobeIcon } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import mockData from "../mockData.json";
+const SUGGESTIONS = [
+  "What are the latest trends in AI?",
+  "How does machine learning work?",
+  "Explain quantum computing",
+  "Best practices for React development",
+];
 
 interface MessageType {
   key: string;
@@ -224,26 +229,9 @@ export function Chatbot() {
   const [status, setStatus] = useState<
     "submitted" | "streaming" | "ready" | "error"
   >("ready");
-  
+
   // Hydrate initial messages on client side to avoid hydration mismatches
   const [messages, setMessages] = useState<MessageType[]>([]);
-  
-  useEffect(() => {
-    setMessages(
-      mockData.initialMessages.map((msg) => ({
-        ...msg,
-        key: nanoid(),
-        versions: msg.versions.map((ver) => ({
-          ...ver,
-          id: nanoid(),
-        })),
-        from: msg.from as "user" | "assistant",
-        sources: msg.sources,
-        tools: msg.tools as any,
-        reasoning: msg.reasoning,
-      }))
-    );
-  }, []);
 
   const [, setStreamingMessageId] = useState<string | null>(null);
 
@@ -257,7 +245,7 @@ export function Chatbot() {
         }
         const data = await res.json();
         const formatted: ClientModel[] = [];
-        
+
         Object.entries(data).forEach(([provider, modelIds]) => {
           if (Array.isArray(modelIds)) {
             modelIds.forEach((modelId) => {
@@ -271,7 +259,7 @@ export function Chatbot() {
             });
           }
         });
-        
+
         setModels(formatted);
         if (formatted.length > 0) {
           setModel(formatted[0].id);
@@ -311,62 +299,157 @@ export function Chatbot() {
     []
   );
 
-  const streamResponse = useCallback(
-    async (messageId: string, content: string) => {
-      setStatus("streaming");
-      setStreamingMessageId(messageId);
-
-      const words = content.split(" ");
-      let currentContent = "";
-
-      for (const [i, word] of words.entries()) {
-        currentContent += (i > 0 ? " " : "") + word;
-        updateMessageContent(messageId, currentContent);
-        await delay(Math.random() * 100 + 50);
+  const addUserMessage = useCallback(
+    async (content: string) => {
+      // Validate model before sending message
+      if (!model) {
+        toast.error("Please select a model first.");
+        setStatus("ready");
+        return;
+      }
+      const isValidModel = models.some((m) => m.id === model);
+      if (!isValidModel) {
+        toast.error(`The selected model "${model}" is not valid or available.`);
+        setStatus("ready");
+        return;
       }
 
-      setStatus("ready");
-      setStreamingMessageId(null);
-    },
-    [updateMessageContent]
-  );
-
-  const addUserMessage = useCallback(
-    (content: string) => {
+      const userMessageId = `user-${Date.now()}`;
       const userMessage: MessageType = {
         from: "user",
-        key: `user-${Date.now()}`,
+        key: userMessageId,
         versions: [
           {
             content,
-            id: `user-${Date.now()}`,
+            id: userMessageId,
           },
         ],
       };
 
       setMessages((prev) => [...prev, userMessage]);
 
-      setTimeout(() => {
-        const assistantMessageId = `assistant-${Date.now()}`;
-        const randomResponse =
-          mockData.mockResponses[Math.floor(Math.random() * mockData.mockResponses.length)];
+      const currentMessages = [...messages, userMessage];
 
-        const assistantMessage: MessageType = {
-          from: "assistant",
-          key: `assistant-${Date.now()}`,
-          versions: [
-            {
-              content: "",
-              id: assistantMessageId,
+      const uiMessages = currentMessages.map((msg) => ({
+        id: msg.versions[0]?.id || msg.key,
+        role: msg.from === "user" ? ("user" as const) : ("assistant" as const),
+        content: msg.versions[0]?.content || "",
+        parts: [
+          { type: "text" as const, text: msg.versions[0]?.content || "" },
+        ],
+      }));
+
+      const assistantMessageId = `assistant-${Date.now()}`;
+      const assistantMessage: MessageType = {
+        from: "assistant",
+        key: assistantMessageId,
+        versions: [
+          {
+            content: "",
+            id: assistantMessageId,
+          },
+        ],
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+      setStatus("streaming");
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: uiMessages,
+            model: model,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Chat API error: ${response.statusText}`);
+        }
+
+        if (!response.body) {
+          throw new Error("No response body received");
+        }
+
+        const parsedStream = parseJsonEventStream({
+          stream: response.body as any,
+          schema: uiMessageChunkSchema,
+        }).pipeThrough(
+          new TransformStream({
+            transform(part, controller) {
+              if (part.success) {
+                controller.enqueue(part.value);
+              } else {
+                throw part.error;
+              }
             },
-          ],
-        };
+          })
+        );
 
-        setMessages((prev) => [...prev, assistantMessage]);
-        streamResponse(assistantMessageId, randomResponse);
-      }, 500);
+        const reader = readUIMessageStream({
+          stream: parsedStream,
+        });
+
+        for await (const uiMessage of reader) {
+          let text = "";
+          let reasoningText = "";
+          const sourcesList: { href: string; title: string }[] = [];
+          const toolsList: NonNullable<MessageType["tools"]> = [];
+
+          if (uiMessage.parts) {
+            for (const part of uiMessage.parts) {
+              if (part.type === "text") {
+                text += part.text;
+              } else if (part.type === "reasoning") {
+                reasoningText += part.text;
+              } else if (part.type === "source-url") {
+                sourcesList.push({ href: (part as any).url, title: (part as any).title || (part as any).url });
+              } else if (part.type.startsWith("tool-") || part.type === "dynamic-tool") {
+                const toolPart = part as any;
+                const toolName = part.type === "dynamic-tool" ? toolPart.toolName : part.type.slice(5);
+                toolsList.push({
+                  name: toolName,
+                  description: toolPart.title || `Executing ${toolName}`,
+                  status: toolPart.state,
+                  parameters: toolPart.input || {},
+                  result: toolPart.state === "output-available" ? JSON.stringify(toolPart.output) : undefined,
+                  error: toolPart.state === "output-error" ? toolPart.errorText : undefined,
+                });
+              }
+            }
+          }
+
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (msg.versions.some((v) => v.id === assistantMessageId)) {
+                return {
+                  ...msg,
+                  versions: msg.versions.map((v) =>
+                    v.id === assistantMessageId ? { ...v, content: text } : v
+                  ),
+                  reasoning: reasoningText
+                    ? { content: reasoningText, duration: msg.reasoning?.duration || 0 }
+                    : undefined,
+                  sources: sourcesList.length ? sourcesList : undefined,
+                  tools: toolsList.length ? toolsList : undefined,
+                };
+              }
+              return msg;
+            })
+          );
+        }
+
+        setStatus("ready");
+      } catch (error: any) {
+        console.error("Error streaming chat response:", error);
+        toast.error(`Error: ${error.message || "Failed to get response"}`);
+        setStatus("error");
+      }
     },
-    [streamResponse]
+    [model, models, messages]
   );
 
   const handleSubmit = useCallback(
@@ -494,7 +577,7 @@ export function Chatbot() {
       <div className="w-full bg-gradient-to-t from-background via-background/95 to-transparent pt-4 pb-6 shrink-0 z-10">
         <div className="mx-auto w-full max-w-3xl px-4 flex flex-col gap-4">
           <Suggestions className="justify-center flex-wrap gap-2">
-            {mockData.suggestions.map((suggestion) => (
+            {SUGGESTIONS.map((suggestion) => (
               <SuggestionItem
                 key={suggestion}
                 onClick={handleSuggestionClick}
@@ -507,10 +590,10 @@ export function Chatbot() {
               <PromptInputAttachmentsDisplay />
             </PromptInputHeader>
             <PromptInputBody>
-              <PromptInputTextarea 
-                onChange={handleTextChange} 
-                value={text} 
-                placeholder="Message Brank AI..." 
+              <PromptInputTextarea
+                onChange={handleTextChange}
+                value={text}
+                placeholder="Message Brank AI..."
                 className="resize-none min-h-[48px] max-h-[200px]"
               />
             </PromptInputBody>
