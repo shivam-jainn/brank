@@ -1,0 +1,117 @@
+# Default values for the brank Helm chart.
+#
+# One-shot install (after building & loading the image into your cluster):
+#   helm install brank ./helm/brank -n brank --create-namespace \
+#     --set image.tag=latest \
+#     --set secrets.DATABASE_URL='postgresql://brank:brank@postgres:5432/brank' \
+#     --set secrets.RABBITMQ_URL='amqp://brank:brank@rabbitmq:5672' \
+#     --set secrets.REDIS_URL='redis://redis:6379' \
+#     --set secrets.OPENAI_API_KEY='sk-...'
+#
+# NOTE: secrets.* values are passed through verbatim and base64-encoded by the
+# template. If you would rather manage secrets out-of-band, set
+# `existingSecret: brank-secrets` and Helm will not create one.
+
+# Container image
+image:
+  repository: brank
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Namespace-scoped name prefix
+nameOverride: ""
+fullnameOverride: ""
+
+# Pull from a remote registry instead of loading locally
+# image:
+#   repository: registry.example.com/brank
+#   tag: latest
+#   pullPolicy: IfNotPresent
+
+# Replica counts
+app:
+  replicas: 2
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+worker:
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# Ingress
+ingress:
+  enabled: true
+  className: nginx
+  host: brank.local
+  # Set to ClusterIP-style access for local clusters (kind/minikube).
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+
+# RabbitMQ management UI NodePort exposure (local debugging only)
+rabbitmqManagementNodePort:
+  enabled: true
+  nodePort: 31672
+
+# Credentials (used to render the Secret unless existingSecret is set)
+postgres:
+  user: brank
+  password: brank
+  database: brank
+  storage: 10Gi
+
+rabbitmq:
+  user: brank
+  password: brank
+  storage: 5Gi
+
+redis:
+  storage: 1Gi
+
+# Migrations run as a Job before app/worker become ready.
+migration:
+  backoffLimit: 3
+
+# Worker tuning
+ingestion:
+  maxBatchSize: 100
+  maxBatchWaitMs: 250
+  maxRetries: 3
+  prefetch: 50
+  queue: brank.inference.events
+  dlq: brank.inference.dlq
+
+# Secret management.
+# If existingSecret is set, the chart will NOT create a Secret and will mount
+# the named secret instead. Otherwise it renders a Secret from `secrets`.
+existingSecret: ""
+secrets:
+  # These three are required for the app/worker to function.
+  DATABASE_URL: ""
+  RABBITMQ_URL: ""
+  REDIS_URL: ""
+  # At least one provider key is required for chat to work.
+  OPENAI_API_KEY: ""
+  GROQ_API_KEY: ""
+  # Optional auth / provider keys.
+  BETTER_AUTH_SECRET: ""
+  ANTHROPIC_API_KEY: ""
+  GOOGLE_API_KEY: ""
+  GEMINI_API_KEY: ""
+  GITHUB_CLIENT_ID: ""
+  GITHUB_CLIENT_SECRET: ""
+  GOOGLE_CLIENT_ID: ""
+  GOOGLE_CLIENT_SECRET: ""

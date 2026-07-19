@@ -1,0 +1,12 @@
+apiVersion: v2
+name: brank
+description: Brank Inferhence — LLM chat app with inference logging & ingestion pipeline
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - llm
+  - chatbot
+  - observability
+  - ingestion
+home: https://github.com/anomalyco/brank

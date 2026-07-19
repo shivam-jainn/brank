@@ -79,6 +79,31 @@ The ingress requires an nginx ingress controller:
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 ```
 
+## Helm Deployment (one-shot)
+
+A packaged Helm chart lives in `helm/brank/`. It renders the same Postgres, Redis, RabbitMQ, migration Job, app, worker, and ingress as the kustomize manifests, all driven by `values.yaml`.
+
+```bash
+# 1. Build the image and load it into your cluster (kind example)
+docker build -t brank:latest .
+kind load docker-image brank:latest --name brank
+
+# 2. Install everything in one shot
+helm install brank ./helm/brank -n brank --create-namespace \
+  --set image.tag=latest \
+  --set secrets.DATABASE_URL='postgresql://brank:brank@brank-postgres:5432/brank' \
+  --set secrets.RABBITMQ_URL='amqp://brank:brank@brank-rabbitmq:5672' \
+  --set secrets.REDIS_URL='redis://brank-redis:6379' \
+  --set secrets.OPENAI_API_KEY='sk-...'
+
+# 3. Wait for migration, then open http://brank.local
+kubectl wait --for=condition=complete job/brank-db-migrate -n brank --timeout=120s
+```
+
+Prefer to manage secrets out-of-band? Create `brank-secrets` yourself and install with `--set existingSecret=brank-secrets`.
+
+A zero-dependency local walkthrough (kind + ingress + screenshot-ready) is in `scripts/deploy-kind.sh`.
+
 ## Environment Variables
 
 All knobs are documented in `.env.example`. Key variables:
@@ -186,3 +211,15 @@ const aggregator = createMetricsAggregator(clickhouseBackend);
 - The worker retries failed batches up to `INGESTION_MAX_RETRIES`; after that, messages are nacked to the DLQ.
 - Events use `eventId` as the DB primary key with `skipDuplicates` for idempotency.
 - `terminationGracePeriodSeconds: 60` on the worker pod ensures in-flight batches finish before eviction.
+
+## What We'd Improve With More Time
+
+- **ClickHouse metrics backend.** The `MetricsBackend` interface is already in place; implementing it would move dashboard aggregation off per-process memory and support cross-replica, long-window queries without summing shards.
+- **DLQ inspection UI.** RabbitMQ dead-letters failed batches, but operators currently need `rabbitmqctl` / the management UI. A small "dead letters" view in the dashboard would close the loop.
+- **Exactly-once ingestion at the worker.** Today we rely on `eventId` idempotency via `skipDuplicates`. A transactional outbox (publish only after DB commit) would remove the rare duplicate-on-retry window entirely.
+- **Stronger PII handling.** Current redaction is regex/key-based — fast and transparent, but it misses novel formats. Adding a lightweight DLP classifier (e.g. presidio) for the `previews` field would tighten the guarantee.
+- **Auth on the ingestion endpoint.** `/api/ingest` is open to anyone who can reach it. Adding an HMAC request signature (the SDK already owns the secret) would prevent telemetry spoofing.
+- **Schema partitioning / retention.** `InferenceEvent` grows unbounded; adding time-partitioning and a retention job (or moving cold data to columnar storage) would keep writes and dashboard queries fast at scale.
+- **Live k8s demo.** Manifests and a Helm chart are provided (see [ARCHITECTURE.md](./ARCHITECTURE.md) and `helm/brank`); a recorded deploy on a managed cluster would round out the deployment story.
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for the detailed ingestion flow, logging strategy, scaling, and failure-handling notes.

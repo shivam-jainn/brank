@@ -331,7 +331,14 @@ export function startMicroBatchConsumer(
       return;
     }
 
-    timer ??= setTimeout(() => void flush(), maxBatchWaitMs);
+    if (!timer) {
+      timer = setTimeout(() => {
+        if (batch.length > 0) {
+          void flush();
+        }
+        timer = undefined;
+      }, maxBatchWaitMs);
+    }
   });
 }
 

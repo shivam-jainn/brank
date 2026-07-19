@@ -7,8 +7,13 @@ const BUILT_IN_RULES: RedactionRule[] = [
   { name: "email", pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi },
   { name: "phone", pattern: /(?:\+?\d[\s().-]?){10,16}/g },
   { name: "payment_card", pattern: /\b(?:\d[ -]*?){13,19}\b/g },
-  { name: "api_key", pattern: /\b(?:sk|pk|rk|api|key|token)_[A-Za-z0-9_\-]{16,}\b/g },
+  { name: "api_key", pattern: /\b(?:sk|pk|rk|api|key|token)[-_][A-Za-z0-9_\-]{12,}\b/gi },
   { name: "bearer_token", pattern: /\bBearer\s+[A-Za-z0-9._~+/=-]{12,}\b/gi },
+  {
+    name: "generic_token",
+    pattern: /\b[A-Za-z0-9_\-]{20,}\b/g,
+    replacement: "[REDACTED:token]",
+  },
 ];
 
 const DEFAULT_SENSITIVE_KEYS = [

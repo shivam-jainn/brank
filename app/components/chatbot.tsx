@@ -15,6 +15,8 @@ import {
   MessageBranchPage,
   MessageBranchPrevious,
   MessageBranchSelector,
+  MessageActions,
+  MessageAction,
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
@@ -78,10 +80,12 @@ import {
   ArrowDownIcon,
   CheckIcon,
   ChevronDownIcon,
+  CopyIcon,
   GlobeIcon,
   KeyRoundIcon,
   LayoutDashboardIcon,
   LogOutIcon,
+  PencilIcon,
   PanelLeftIcon,
   Settings2Icon,
   SquarePenIcon,
@@ -257,6 +261,145 @@ const SuggestionItem = ({
   return <Suggestion onClick={handleClick} suggestion={suggestion} />;
 };
 
+const ChatMessage = ({
+  from,
+  messageKey,
+  content,
+  reasoning,
+  sources,
+  onEditUserMessage,
+}: {
+  from: "user" | "assistant";
+  messageKey: string;
+  content: string;
+  reasoning?: MessageType["reasoning"];
+  sources?: MessageType["sources"];
+  onEditUserMessage: (messageKey: string, newContent: string) => void;
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(content);
+  const [isCopied, setIsCopied] = useState(false);
+  const copyTimeoutRef = useRef<number>(0);
+
+  useEffect(
+    () => () => {
+      window.clearTimeout(copyTimeoutRef.current);
+    },
+    []
+  );
+
+  const handleCopy = useCallback(async () => {
+    if (typeof window === "undefined" || !navigator?.clipboard?.writeText) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(content);
+      setIsCopied(true);
+      copyTimeoutRef.current = window.setTimeout(() => setIsCopied(false), 1500);
+    } catch {
+      // ignore clipboard errors
+    }
+  }, [content]);
+
+  const handleSaveEdit = useCallback(() => {
+    setIsEditing(false);
+    if (from === "user") {
+      onEditUserMessage(messageKey, editedContent);
+    }
+  }, [from, messageKey, editedContent, onEditUserMessage]);
+
+  return (
+    <Message className="py-1" from={from}>
+      <div className="w-full">
+        {sources?.length && (
+          <div className="mb-3">
+            <Sources>
+              <SourcesTrigger count={sources.length} />
+              <SourcesContent>
+                {sources.map((source) => (
+                  <Source href={source.href} key={source.href} title={source.title} />
+                ))}
+              </SourcesContent>
+            </Sources>
+          </div>
+        )}
+        {reasoning && (
+          <div className="mb-3">
+            <Reasoning duration={reasoning.duration}>
+              <ReasoningTrigger />
+              <ReasoningContent>{reasoning.content}</ReasoningContent>
+            </Reasoning>
+          </div>
+        )}
+        <MessageContent
+          className={cn(
+            from === "user"
+              ? "ml-auto max-w-[85%] rounded-3xl bg-[#303030] px-4 py-2.5 text-[15px] font-normal text-[#ececec]"
+              : "max-w-full rounded-2xl bg-[#303030] px-4 py-3 text-[15px] leading-7 text-[#ececec]"
+          )}
+        >
+          {isEditing ? (
+            <div className="flex flex-col gap-2">
+              <textarea
+                autoFocus
+                className="min-h-[80px] w-full resize-y rounded-lg border border-white/10 bg-[#1f1f1f] px-3 py-2 text-[15px] leading-7 text-[#ececec] outline-none focus:border-white/25"
+                onChange={(event) => setEditedContent(event.target.value)}
+                value={editedContent}
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  className="rounded-lg px-3 py-1.5 text-[13px] text-[#b4b4b4] hover:bg-white/10"
+                  onClick={() => {
+                    setEditedContent(content);
+                    setIsEditing(false);
+                  }}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="rounded-lg bg-white px-3 py-1.5 text-[13px] font-medium text-black hover:bg-[#e5e5e5]"
+                  onClick={handleSaveEdit}
+                  type="button"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : (
+            <MessageResponse>{content}</MessageResponse>
+          )}
+        </MessageContent>
+        <MessageActions
+          className={cn(
+            "mt-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100",
+            from === "user" && "justify-end"
+          )}
+        >
+          <MessageAction
+            aria-label="Copy message"
+            label="Copy message"
+            onClick={handleCopy}
+            tooltip={isCopied ? "Copied" : "Copy"}
+          >
+            {isCopied ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+          </MessageAction>
+          {from === "user" && (
+            <MessageAction
+              aria-label="Edit message"
+              label="Edit message"
+              onClick={() => setIsEditing((prev) => !prev)}
+              tooltip="Edit"
+            >
+              <PencilIcon size={14} />
+            </MessageAction>
+          )}
+        </MessageActions>
+      </div>
+    </Message>
+  );
+};
+
 const ModelItem = ({
   provider,
   modelId,
@@ -356,7 +499,9 @@ const ProviderAccordionItem = ({
 export function Chatbot() {
   const router = useRouter();
   const [providers, setProviders] = useState<ClientProvider[]>([]);
-  const [model, setModel] = useState<string>("");
+  const [model, setModel] = useState<string>(() =>
+    typeof window === "undefined" ? "" : window.localStorage.getItem("brank-selected-model") ?? ""
+  );
   const [modelSearch, setModelSearch] = useState("");
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -776,6 +921,28 @@ export function Chatbot() {
     [addUserMessage]
   );
 
+  const handleEditUserMessage = useCallback(
+    (messageKey: string, newContent: string) => {
+      if (!newContent.trim()) {
+        return;
+      }
+
+      const messageIndex = messages.findIndex((msg) => msg.key === messageKey);
+
+      if (messageIndex === -1) {
+        return;
+      }
+
+      const trimmedMessages = messages.slice(0, messageIndex);
+
+      setMessages(trimmedMessages);
+
+      setStatus("submitted");
+      addUserMessage(newContent);
+    },
+    [messages, addUserMessage]
+  );
+
   const handleTranscriptionChange = useCallback((transcript: string) => {
     setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
   }, []);
@@ -797,6 +964,7 @@ export function Chatbot() {
   }, []);
 
   const handleModelSelect = useCallback((modelId: string) => {
+    window.localStorage.setItem("brank-selected-model", modelId);
     setModel(modelId);
     setModelSelectorOpen(false);
   }, []);
@@ -1011,49 +1179,15 @@ export function Chatbot() {
                       <MessageBranch defaultBranch={0}>
                         <MessageBranchContent>
                           {versions.map((version) => (
-                            <Message
-                              className="py-1"
-                              from={message.from}
+                            <ChatMessage
                               key={`${message.key}-${version.id}`}
-                            >
-                              <div className="w-full">
-                                {message.sources?.length && (
-                                  <div className="mb-3">
-                                    <Sources>
-                                      <SourcesTrigger count={message.sources.length} />
-                                      <SourcesContent>
-                                        {message.sources.map((source) => (
-                                          <Source
-                                            href={source.href}
-                                            key={source.href}
-                                            title={source.title}
-                                          />
-                                        ))}
-                                      </SourcesContent>
-                                    </Sources>
-                                  </div>
-                                )}
-                                {message.reasoning && (
-                                  <div className="mb-3">
-                                    <Reasoning duration={message.reasoning.duration}>
-                                      <ReasoningTrigger />
-                                      <ReasoningContent>
-                                        {message.reasoning.content}
-                                      </ReasoningContent>
-                                    </Reasoning>
-                                  </div>
-                                )}
-                                <MessageContent
-                                  className={cn(
-                                    message.from === "user"
-                                      ? "ml-auto max-w-[85%] rounded-3xl bg-[#303030] px-4 py-2.5 text-[15px] font-normal text-[#ececec]"
-                                      : "text-[15px] leading-7 text-[#ececec]"
-                                  )}
-                                >
-                                  <MessageResponse>{version.content}</MessageResponse>
-                                </MessageContent>
-                              </div>
-                            </Message>
+                              from={message.from}
+                              messageKey={message.key}
+                              content={version.content}
+                              reasoning={message.reasoning}
+                              sources={message.sources}
+                              onEditUserMessage={handleEditUserMessage}
+                            />
                           ))}
                         </MessageBranchContent>
                         {versions.length > 1 && (

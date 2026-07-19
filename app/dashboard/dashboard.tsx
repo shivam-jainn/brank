@@ -3,18 +3,19 @@
 import {
   ActivityIcon,
   AlertTriangleIcon,
-  ArrowUpRightIcon,
+  Check,
   CircleIcon,
+  Copy,
   GaugeIcon,
   LogsIcon,
   MessageSquareIcon,
-  RefreshCwIcon,
+  PanelLeftIcon,
   SquareIcon,
+  Terminal,
+  X
 } from "lucide-react";
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Terminal, PanelLeftIcon, X, Copy, Check } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useMemo, useState } from "react";
 import { AppSidebar } from "../components/app-sidebar";
 
 type TimePoint = {
@@ -173,7 +174,7 @@ export function Dashboard() {
     <div className="flex min-h-0 flex-1 overflow-hidden bg-[#212121]">
       <AppSidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
 
-      <motion.main 
+      <motion.main
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}
@@ -227,12 +228,6 @@ export function Dashboard() {
                 <Stat label="Failed calls" value={formatPercent(metrics?.totals.lastHour.errorRate)} detail={`${metrics?.totals.failedRuns ?? 0} failed calls total`} icon={<AlertTriangleIcon className="size-4" />} intent="bad" />
               </section>
 
-              <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <Definition label="LLM calls/min" value="Completed, failed, cancelled, and in-flight model invocations per minute." />
-                <Definition label="Messages/min" value="Persisted chat messages, separate from provider calls." />
-                <Definition label="Tokens/min" value={usageAvailable ? `${(metrics?.totals.tokenThroughputPerMinute ?? 0).toFixed(1)} tokens/min; ${metrics?.totals.lastHour.exactTokenRuns ?? 0} exact, ${metrics?.totals.lastHour.estimatedTokenRuns ?? 0} estimated runs.` : "Estimated fallback will appear after the next completed or cancelled stream."} />
-                <Definition label="Pipeline count" value={`${metrics?.pipeline.persistedEvents ?? 0} persisted telemetry events, ${metrics?.totals.totalRuns ?? 0} derived LLM runs.`} />
-              </section>
 
               <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <Panel
@@ -280,7 +275,7 @@ export function Dashboard() {
 
               <section className="mt-8 border-t border-white/10 pt-8">
                 <div className="flex items-center justify-between gap-4 mb-6">
-                  <div>
+                   <div>
                     <h3 className="text-lg font-semibold text-[#ececec]">Live Ingestion Console</h3>
                     <p className="text-xs text-[#8b8b8b] mt-1">Real-time telemetry written to pipeline</p>
                   </div>
@@ -636,11 +631,12 @@ function LogList({ events, onSelectEvent }: { events: RecentEvent[]; onSelectEve
           className="flex flex-col md:flex-row md:items-center justify-between rounded border border-white/10 bg-[#191a1b] p-3 font-mono text-xs transition-all shadow-sm hover:border-white/20 hover:bg-[#1f2022] gap-3 cursor-pointer"
         >
           <div className="flex items-center gap-3">
-            <span className={`h-2 w-2 shrink-0 rounded-full ${event.provider === "openai" ? "bg-[#10a37f]" :
-                event.provider === "anthropic" ? "bg-[#cc9b7a]" :
-                  event.provider === "groq" ? "bg-[#f55036]" :
-                    event.provider === "gemini" ? "bg-[#4285f4]" : "bg-[#74a742]"
-              }`} />
+            <span
+              className={`h-2 w-2 shrink-0 rounded-full ${event.status === "completed" ? "bg-[#74a742]" :
+                  event.status === "failed" ? "bg-[#ff6b57]" :
+                    event.status === "cancelled" ? "bg-[#ffbf69]" : "bg-white/40"
+                }`}
+            />
             <span className="font-semibold text-[#f3f1ea]">{event.id.slice(0, 8)}</span>
             <span className="text-[#7d7f79]">/</span>
             <span className="truncate text-[#a9aaa7]">{event.provider}:{event.model}</span>
@@ -735,11 +731,11 @@ function DetailDrawer({
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div
         onClick={onClose}
         className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
       />
-      
+
       {/* Drawer */}
       <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-2xl flex-col border-l border-white/10 bg-[#161718]/95 p-6 shadow-2xl backdrop-blur-md transition-all duration-300">
         <div className="flex items-center justify-between border-b border-white/10 pb-4">

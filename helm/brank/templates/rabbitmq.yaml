@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "brank.fullname" . }}-rabbitmq-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "brank.labels" . | nindent 4 }}
+    app: rabbitmq
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.rabbitmq.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "brank.fullname" . }}-rabbitmq
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "brank.labels" . | nindent 4 }}
+    app: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+      instance: {{ .Release.Name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+        instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management-alpine
+          ports:
+            - name: amqp
+              containerPort: 5672
+            - name: management
+              containerPort: 15672
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: {{ .Values.rabbitmq.user | quote }}
+            - name: RABBITMQ_DEFAULT_PASS
+              value: {{ .Values.rabbitmq.password | quote }}
+          volumeMounts:
+            - name: rabbitmq-storage
+              mountPath: /var/lib/rabbitmq
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "check_running"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+      volumes:
+        - name: rabbitmq-storage
+          persistentVolumeClaim:
+            claimName: {{ include "brank.fullname" . }}-rabbitmq-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "brank.fullname" . }}-rabbitmq
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "brank.labels" . | nindent 4 }}
+    app: rabbitmq
+spec:
+  selector:
+    app: rabbitmq
+    instance: {{ .Release.Name }}
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+  type: ClusterIP
+{{- if .Values.rabbitmqManagementNodePort.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "brank.fullname" . }}-rabbitmq-management
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "brank.labels" . | nindent 4 }}
+    app: rabbitmq
+spec:
+  selector:
+    app: rabbitmq
+    instance: {{ .Release.Name }}
+  ports:
+    - port: 15672
+      targetPort: 15672
+      nodePort: {{ .Values.rabbitmqManagementNodePort.nodePort }}
+  type: NodePort
+{{- end }}

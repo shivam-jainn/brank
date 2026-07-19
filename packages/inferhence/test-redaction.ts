@@ -6,6 +6,7 @@ const result = redactPreview({
   card: "4242 4242 4242 4242",
   authorization: "Bearer abcdefghijklmnop",
   apiKey: "sk_abcdefghijklmnopqrstuvwxyz",
+  bareToken: "3920jsd8hzchzuhdusd8hds",
   tenant: "tenant-123",
   long: "x".repeat(40),
 }, {
