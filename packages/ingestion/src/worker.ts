@@ -116,12 +116,7 @@ async function main() {
   setInterval(() => {
     const metrics = service.metrics();
     console.info(
-      "[worker] depth=%d pending=%d processed=%d failed=%d tps=%.2f",
-      metrics.queueDepth,
-      metrics.pendingBatchSize,
-      metrics.totalProcessed,
-      metrics.totalFailed,
-      metrics.throughputPerSecond,
+      `[worker] depth=${metrics.queueDepth} pending=${metrics.pendingBatchSize} processed=${metrics.totalProcessed} failed=${metrics.totalFailed} tps=${metrics.throughputPerSecond.toFixed(2)}`,
     );
   }, 30_000).unref();
 

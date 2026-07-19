@@ -41,9 +41,11 @@ echo "==> Deploying Brank via Helm"
 helm upgrade --install "$RELEASE_NAME" ./helm/brank \
   --namespace "$NAMESPACE" --create-namespace \
   --set image.tag=latest \
+  --set app.replicas=1 \
   --set secrets.DATABASE_URL="postgresql://brank:brank@${RELEASE_NAME}-postgres:5432/brank" \
   --set secrets.RABBITMQ_URL="amqp://brank:brank@${RELEASE_NAME}-rabbitmq:5672" \
   --set secrets.REDIS_URL="redis://${RELEASE_NAME}-redis:6379" \
+  --set secrets.BETTER_AUTH_SECRET="$(openssl rand -base64 32)" \
   --set secrets.OPENAI_API_KEY="${OPENAI_API_KEY:-sk-placeholder}" \
   --wait --timeout 180s
 
