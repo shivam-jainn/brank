@@ -26,6 +26,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import { BrankLogo } from "@/components/ui/brank-logo";
+
 const CONVERSATIONS_QUERY_KEY = ["conversations", "recent"] as const;
 
 type SavedConversation = {
@@ -139,7 +141,9 @@ export function AppSidebar({
       )}
     >
       <div className="mb-2 flex h-10 items-center justify-between px-2">
-        <Image alt="Olive AI" height={25} src="/olive-mark.svg" width={25} />
+        <Link href="/">
+          <BrankLogo />
+        </Link>
         <button
           aria-label="Collapse sidebar"
           className="rounded-lg p-2 text-[#b4b4b4] transition-colors hover:bg-white/10 hover:text-white"

@@ -4,9 +4,10 @@ import Link from "next/link";
 import { ArrowRightIcon, Terminal, Activity, Shield, Cpu, Layers } from "lucide-react";
 import { useState, useEffect } from "react";
 
-import { HeroDitheringRoot, HeroDitheringVisual } from "@/components/ui/hero-dithering";
+import { PixelMosaic } from "./pixel-mosaic";
 import { LightboardFooter } from "./lightboard-footer";
 import { useSession } from "@/lib/auth-client";
+import { BrankLogo } from "@/components/ui/brank-logo";
 
 const sampleLogs = [
   { provider: "openai", model: "gpt-4.1", status: "200", duration: "184ms", tokens: "420", trace: "tr_8fx1a9" },
@@ -33,14 +34,8 @@ export function LandingPage() {
 
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#0f1011]/90 backdrop-blur-md">
         <nav className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-6 sm:px-8 lg:px-12">
-          <Link className="flex items-center gap-2.5 group" href="/">
-            <span className="grid size-7 grid-cols-2 gap-[3px] p-1 border border-white/10 bg-[#191a1b]/60 rounded">
-              <i className="block bg-[#f3f1ea] group-hover:bg-[#d7ff73] transition-colors" />
-              <i className="block bg-[#d7ff73]" />
-              <i className="block bg-[#f3f1ea] group-hover:bg-[#d7ff73] transition-colors" />
-              <i className="block bg-[#f3f1ea] group-hover:bg-[#d7ff73] transition-colors" />
-            </span>
-            <span className="text-base font-semibold tracking-tight text-[#f3f1ea]">Brank</span>
+          <Link href="/">
+            <BrankLogo />
           </Link>
 
           <div className="hidden items-center gap-8 text-sm text-[#a9aaa7] md:flex">
@@ -71,103 +66,51 @@ export function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative mx-auto max-w-[1440px] px-6 pt-16 sm:px-8 sm:pt-24 lg:px-12 lg:pt-32">
-        <div className="grid gap-12 lg:grid-cols-12 lg:gap-16 items-start">
+      <section className="relative overflow-hidden" id="trace">
+        {/* Full-bleed background mosaic */}
+        <PixelMosaic className="absolute inset-0 w-full h-full !rounded-none" />
 
-          {/* Hero Content Left */}
-          <div className="lg:col-span-7 mb-8 sm:mb-8 flex flex-col justify-center">
-            <div className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-[#191a1b]/40 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#a9aaa7]">
+        {/* Content on top */}
+        <div className="relative z-10 mx-auto max-w-[1440px] px-6 py-24 sm:px-8 sm:py-32 lg:px-12 lg:py-44">
+          <div className="max-w-2xl">
+            <div className="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-[#0f1011]/60 backdrop-blur-sm px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#d7ff73]">
               <span className="size-2 rounded-full bg-[#d7ff73] animate-pulse" />
               Self-driving LLM Telemetry
             </div>
 
-            {/* Custom Heading Requested by User */}
-            <h1 className="max-w-[680px] text-[clamp(2.5rem,6vw,5.5rem)] font-extrabold leading-[1.0] tracking-tight text-[#f3f1ea]">
+            <h1 className="text-[clamp(2.5rem,6vw,5.5rem)] font-extrabold leading-[1.0] tracking-tight text-[#f3f1ea]">
               trace everything <span className="text-[#7d7f79]">.</span><br />
               in one place <span className="text-[#7d7f79]">.</span><br />
               one clean setup <span className="text-[#7d7f79]">.</span><br />
               <span className="text-[#d7ff73]">with scalable telemetry.</span>
             </h1>
 
-            <p className="mt-8 max-w-xl text-base sm:text-lg leading-relaxed text-[#a9aaa7]">
+            <p className="mt-8 max-w-xl text-base sm:text-lg leading-relaxed text-[#c5c6c3]">
               A high-performance pipeline for wrapping model calls, capturing detailed traces, metrics, latency, and tokens with zero friction.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-4">
               {!isSessionPending && session ? (
-                <Link className="inline-flex h-11 items-center gap-2 rounded bg-[#d7ff73] px-6 text-sm font-semibold text-[#10140d] hover:bg-[#e1ff91] transition-colors shadow-sm" href="/chat">
+                <Link className="inline-flex h-11 items-center gap-2 rounded bg-[#d7ff73] px-6 text-sm font-semibold text-[#10140d] hover:bg-[#e1ff91] transition-colors shadow-lg shadow-[#d7ff73]/20" href="/chat">
                   Go to chat
                   <ArrowRightIcon className="size-4" />
                 </Link>
               ) : (
-                <Link className="inline-flex h-11 items-center gap-2 rounded bg-[#d7ff73] px-6 text-sm font-semibold text-[#10140d] hover:bg-[#e1ff91] transition-colors shadow-sm" href="/auth/sign-up">
+                <Link className="inline-flex h-11 items-center gap-2 rounded bg-[#d7ff73] px-6 text-sm font-semibold text-[#10140d] hover:bg-[#e1ff91] transition-colors shadow-lg shadow-[#d7ff73]/20" href="/auth/sign-up">
                   Get started free
                   <ArrowRightIcon className="size-4" />
                 </Link>
               )}
             </div>
           </div>
-
-          {/* Hero Visual Right (Custom Dither Sink) */}
-          <div className="lg:col-span-5 relative w-full flex items-center justify-center" id="trace">
-            <HeroDitheringRoot className="overflow-visible relative w-full h-[350px] lg:h-[500px]">
-              <HeroDitheringVisual
-                className="!block h-full w-full"
-                desktopClassName="!rounded-3xl border border-white/10 bg-[#111213] shadow-xl shadow-black/50"
-                desktopShaderProps={{
-                  colorBack: "#0f1011",
-                  colorFront: "#d7ff73",
-                  shape: "swirl",
-                  type: "4x4",
-                  scale: 0.75,
-                  speed: 0.8,
-                }}
-              />
-
-              {/* Telemetry Overlays matching mockup */}
-              <div className="absolute inset-4 pointer-events-none flex flex-col justify-between z-20">
-                <div className="flex justify-between items-start">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 font-mono text-[9px] font-bold text-[#a9aaa7] uppercase tracking-widest">
-                      <span className="size-1.5 rounded-full bg-[#d7ff73] animate-pulse" />
-                      Ingestion_Pipeline: Active
-                    </div>
-                    <div className="flex gap-2">
-                      <span className="rounded border border-white/10 bg-[#191a1b]/80 px-1.5 py-[1px] font-mono text-[8px] text-[#f3f1ea] shadow-sm">BATCH_SIZE: 100</span>
-                      <span className="rounded border border-white/10 bg-[#191a1b]/80 px-1.5 py-[1px] font-mono text-[8px] text-[#f3f1ea] shadow-sm">WAIT_MS: 250</span>
-                    </div>
-                  </div>
-
-                  {/* Provider Tags (top right) */}
-                  <div className="flex gap-1 flex-wrap justify-end max-w-[200px]">
-                    {[
-                      { name: "OPENAI", color: "bg-white" },
-                      { name: "ANTHROPIC", color: "bg-[#cc9b7a]" },
-                      { name: "GROQ", color: "bg-[#f55036]" },
-                      { name: "GEMINI", color: "bg-[#4285f4]" },
-                      { name: "LLAMA", color: "bg-[#d7ff73]" },
-                    ].map((provider) => (
-                      <span key={provider.name} className="flex items-center gap-1 rounded border border-white/10 bg-[#191a1b]/90 px-1.5 py-[2px] font-mono text-[8px] text-[#f3f1ea] shadow-sm">
-                        <span className={`size-1 rounded-full ${provider.color}`} />
-                        {provider.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-end pb-2">
-                  <span className="font-mono text-[10px] font-medium text-[#7d7f79]">SINK_GRAVITY: G_FORCE_1.2</span>
-                  <span className="font-mono text-[10px] font-medium text-[#7d7f79]">RESOLVED: 100% TELEMETRY</span>
-                </div>
-              </div>
-            </HeroDitheringRoot>
-          </div>
-
         </div>
+
+        {/* Bottom fade into page */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#0f1011] to-transparent z-10 pointer-events-none" />
       </section>
 
       {/* Simulated Live Traces Console */}
-      <section className="relative w-full bg-[#d7ff73] py-20 mt-16">
+      <section className="relative w-full bg-[#d7ff73] py-20">
         <div className="mx-auto max-w-[1440px] px-6 sm:px-8 lg:px-12">
           <div className="rounded-xl border border-white/10 bg-[#171819] p-6 md:p-8 shadow-sm">
             <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-6 md:flex-row md:items-center">

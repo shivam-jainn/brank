@@ -76,6 +76,37 @@ export const POST = withLogging(async function POST(req: Request) {
     );
     const assistantMessageId = crypto.randomUUID();
     let assistantText = '';
+    let isSaved = false;
+
+    const saveAssistantResponse = async () => {
+        if (isSaved) return;
+        isSaved = true;
+
+        if (!assistantText) {
+            return;
+        }
+
+        await persistChatResponse({
+            conversationId,
+            sessionId,
+            requestId,
+            traceId,
+            provider,
+            model: modelName,
+            message: {
+                id: assistantMessageId,
+                role: 'assistant',
+                parts: [{ type: 'text', text: assistantText }],
+            },
+        });
+    };
+
+    req.signal.addEventListener('abort', () => {
+        saveAssistantResponse().catch((err) => {
+            console.error('Failed to persist aborted chat response:', err);
+        });
+    });
+
     const persistedResponseStream = instrumentedStream.pipeThrough(new TransformStream({
         transform(chunk, controller) {
             if (chunk.type === 'text-delta') {
@@ -84,28 +115,34 @@ export const POST = withLogging(async function POST(req: Request) {
             controller.enqueue(chunk);
         },
         async flush() {
-            if (!assistantText) {
-                return;
-            }
-
-            await persistChatResponse({
-                conversationId,
-                sessionId,
-                requestId,
-                traceId,
-                provider,
-                model: modelName,
-                message: {
-                    id: assistantMessageId,
-                    role: 'assistant',
-                    parts: [{ type: 'text', text: assistantText }],
-                },
-            });
+            await saveAssistantResponse();
         },
     }));
 
+    const responseStream = new ReadableStream({
+        async start(controller) {
+            const reader = persistedResponseStream.getReader();
+            try {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        controller.close();
+                        break;
+                    }
+                    controller.enqueue(value);
+                }
+            } catch (err) {
+                controller.error(err);
+            }
+        },
+        async cancel(reason) {
+            await saveAssistantResponse();
+            await persistedResponseStream.cancel(reason);
+        }
+    });
+
     return createUIMessageStreamResponse({
-        stream: toUIMessageStream({ stream: persistedResponseStream }),
+        stream: toUIMessageStream({ stream: responseStream }),
         consumeSseStream: consumeStream,
     });
 });

@@ -96,6 +96,7 @@ import { cn } from "@/lib/utils";
 import { SettingsDialog, readProviderKeys } from "./settings-dialog";
 import { AppSidebar } from "./app-sidebar";
 import { motion } from "motion/react";
+import { BrankLogo } from "@/components/ui/brank-logo";
 
 const CONVERSATIONS_QUERY_KEY = ["conversations", "recent"] as const;
 
@@ -377,6 +378,18 @@ export function Chatbot() {
   const scrollParentRef = useRef<HTMLDivElement | null>(null);
 
   const [messages, setMessages] = useState<MessageType[]>([]);
+
+  const watermarkRef = useRef<HTMLSpanElement>(null);
+  const [watermarkMousePos, setWatermarkMousePos] = useState({ x: -1000, y: -1000 });
+  const [isHoveringChat, setIsHoveringChat] = useState(false);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!watermarkRef.current) return;
+    const rect = watermarkRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    setWatermarkMousePos({ x, y });
+  }, []);
 
   const {
     data: savedConversations = [],
@@ -863,6 +876,12 @@ export function Chatbot() {
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, ease: [0.25, 1, 0.5, 1] }}
+        onMouseMove={handleMouseMove}
+        onMouseEnter={() => setIsHoveringChat(true)}
+        onMouseLeave={() => {
+          setIsHoveringChat(false);
+          setWatermarkMousePos({ x: -1000, y: -1000 });
+        }}
         className="relative flex min-w-0 flex-1 flex-col overflow-hidden"
       >
         <header className="z-20 flex h-14 shrink-0 items-center justify-between px-3 md:px-4">
@@ -929,7 +948,9 @@ export function Chatbot() {
               </ModelSelectorContent>
             </ModelSelector>
           </div>
-          <Image alt="Olive AI" className="md:hidden" height={24} src="/olive-mark.svg" width={24} />
+          <Link href="/">
+            <BrankLogo className="md:hidden" showText={true} />
+          </Link>
         </header>
         <SettingsDialog
           initialSection={settingsSection}
@@ -941,15 +962,18 @@ export function Chatbot() {
           providers={providers}
         />
 
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden">
-          <Image
-            alt=""
-            className="translate-y-[-3vh] opacity-[0.055]"
-            height={540}
-            priority
-            src="/olive-mark.svg"
-            width={540}
-          />
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden select-none">
+          <span
+            ref={watermarkRef}
+            className="text-[12vw] md:text-[120px] font-extrabold translate-y-[-3vh] tracking-tighter select-none bg-clip-text text-transparent bg-no-repeat transition-all duration-300"
+            style={{
+              backgroundImage: `radial-gradient(180px circle at ${watermarkMousePos.x}px ${watermarkMousePos.y}px, #d7ff73 0%, #2b2d31 50%, #151617 100%)`,
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            brank.
+          </span>
         </div>
 
         <div
