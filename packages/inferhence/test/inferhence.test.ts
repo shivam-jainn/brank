@@ -196,6 +196,69 @@ describe("events and wrappers", () => {
     ]);
   });
 
+  test("emits cancelled when the wrapped ReadableStream is cancelled", async () => {
+    const transport = createMemoryTransport();
+    const stream = withReadableStreamingInference("input", () => new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue("hello ");
+        controller.enqueue("world");
+      },
+    }), {
+      metadata,
+      transport,
+      clock: clockFactory(1_000, 1_001, 1_002, 1_100),
+      idFactory: () => "id",
+    });
+
+    const reader = stream.getReader();
+    const first = await reader.read();
+    expect(first.value).toBe("hello ");
+
+    // Cancel the stream
+    await reader.cancel();
+
+    expect(transport.events.map((event) => event.eventType)).toEqual([
+      "started",
+      "first_token",
+      "cancelled",
+    ]);
+  });
+
+  test("emits cancelled when the AbortSignal aborts during stream execution", async () => {
+    const transport = createMemoryTransport();
+    const controller = new AbortController();
+    
+    // Simulate a stream that remains open/suspended
+    const stream = withReadableStreamingInference("input", () => new ReadableStream<string>({
+      start(controller) {
+        controller.enqueue("hello ");
+      },
+    }), {
+      metadata,
+      transport,
+      signal: controller.signal,
+      clock: clockFactory(1_000, 1_001, 1_100),
+      idFactory: () => "id",
+    });
+
+    const reader = stream.getReader();
+    const first = await reader.read();
+    expect(first.value).toBe("hello ");
+
+    // Abort the signal to simulate client aborting request
+    controller.abort();
+
+    // Wait a tick for async abort handler to run
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // The stream should have triggered the event
+    expect(transport.events.map((event) => event.eventType)).toEqual([
+      "started",
+      "first_token",
+      "cancelled",
+    ]);
+  });
+
   test("emits cancelled when the wrapped call aborts", async () => {
     const transport = createMemoryTransport();
     const controller = new AbortController();

@@ -107,6 +107,10 @@ export async function* withStreamingInference<TChunk>(
       yield chunk;
     }
 
+    if (options.signal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
+
     await emit("completed", { output, usage: withEstimatedUsage(input, output, usage), completed: true });
   } catch (error) {
     await emit(isAbortError(error) || options.signal?.aborted ? "cancelled" : "failed", {
@@ -127,25 +131,85 @@ export function withReadableStreamingInference<TChunk>(
     usageFromChunk?: (chunk: TChunk) => TokenUsage | undefined;
   },
 ): ReadableStream<TChunk> {
+  let activeReader: ReadableStreamDefaultReader<TChunk> | undefined;
+
   const iterable = withStreamingInference(
     input,
-    (signal) => readableStreamToAsyncIterable(streamFactory(signal)),
+    (signal) => {
+      const stream = streamFactory(signal);
+      return readableStreamToAsyncIterable(stream, (reader) => {
+        activeReader = reader;
+      });
+    },
     options,
   );
   const iterator = iterable[Symbol.asyncIterator]();
 
-  return new ReadableStream<TChunk>({
-    async pull(controller) {
-      const next = await iterator.next();
-      if (next.done) {
-        controller.close();
-        return;
+  let abortedListener: (() => void) | undefined;
+
+  const cleanup = () => {
+    if (abortedListener && options.signal) {
+      options.signal.removeEventListener("abort", abortedListener);
+      abortedListener = undefined;
+    }
+  };
+
+  if (options.signal) {
+    abortedListener = async () => {
+      cleanup();
+      
+      if (activeReader) {
+        try {
+          await activeReader.cancel(new DOMException("The operation was aborted.", "AbortError"));
+        } catch (e) {
+          // swallow
+        }
       }
 
-      controller.enqueue(next.value);
+      const error = new DOMException("The operation was aborted.", "AbortError");
+      try {
+        await iterator.throw?.(error);
+      } catch (e) {
+        // swallow
+      }
+      await iterator.return?.();
+    };
+
+    if (options.signal.aborted) {
+      abortedListener();
+    } else {
+      options.signal.addEventListener("abort", abortedListener);
+    }
+  }
+
+  return new ReadableStream<TChunk>({
+    async pull(controller) {
+      try {
+        const next = await iterator.next();
+        if (next.done) {
+          cleanup();
+          controller.close();
+          return;
+        }
+
+        controller.enqueue(next.value);
+      } catch (err) {
+        cleanup();
+        controller.error(err);
+      }
     },
     async cancel(reason) {
-      await iterator.throw?.(reason);
+      cleanup();
+      const error = (reason instanceof Error && (reason.name === "AbortError" || reason.message.toLowerCase().includes("abort") || reason.message.toLowerCase().includes("cancel")))
+        ? reason
+        : new DOMException("The operation was aborted.", "AbortError");
+      try {
+        await iterator.throw?.(error);
+      } catch (e) {
+        if (!isAbortError(e)) {
+          throw e;
+        }
+      }
       await iterator.return?.();
     },
   });
@@ -165,8 +229,10 @@ function normalizeCompletionResult<T>(result: T | CompletionResult<T>): Completi
 
 async function* readableStreamToAsyncIterable<TChunk>(
   stream: ReadableStream<TChunk>,
+  onReader?: (reader: ReadableStreamDefaultReader<TChunk>) => void,
 ): AsyncIterable<TChunk> {
   const reader = stream.getReader();
+  onReader?.(reader);
 
   try {
     while (true) {
@@ -183,7 +249,15 @@ async function* readableStreamToAsyncIterable<TChunk>(
 }
 
 function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return true;
+  }
+  if (error instanceof Error) {
+    const name = error.name;
+    const msg = error.message.toLowerCase();
+    return name === "AbortError" || msg.includes("abort") || msg.includes("cancel");
+  }
+  return false;
 }
 
 function shouldEmitProgress(

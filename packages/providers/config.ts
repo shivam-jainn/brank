@@ -1,6 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { lmstudio } from './custom/lmstudio';
 import { appConfig } from '@/lib/config';
 
@@ -18,7 +19,8 @@ type ProviderConfig = {
     createSdk?: (apiKey: string) =>
         | ReturnType<typeof createOpenAI>
         | ReturnType<typeof createAnthropic>
-        | ReturnType<typeof createGoogleGenerativeAI>;
+        | ReturnType<typeof createGoogleGenerativeAI>
+        | ReturnType<typeof createOpenAICompatible>;
     label: string;
     description: string;
     apiKey?: string;
@@ -125,11 +127,13 @@ export const providers = {
         apiKey: appConfig.providers.groqApiKey,
         apiKeyEnv: 'GROQ_API_KEY',
         defaultModel: 'llama-3.3-70b-versatile',
-        sdk: createOpenAI({
+        sdk: createOpenAICompatible({
+            name: 'groq',
             apiKey: appConfig.providers.groqApiKey,
             baseURL: 'https://api.groq.com/openai/v1',
         }),
-        createSdk: (apiKey: string) => createOpenAI({
+        createSdk: (apiKey: string) => createOpenAICompatible({
+            name: 'groq',
             apiKey,
             baseURL: 'https://api.groq.com/openai/v1',
         }),
