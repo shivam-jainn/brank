@@ -5,10 +5,10 @@ import {
     createUIMessageStreamResponse,
     toUIMessageStream,
 } from 'ai';
-import { registry } from '@/packages/providers/proivderregistry';
-import { ProviderRegistryProvider } from 'ai';
+import { registry } from '@/packages/providers/registry';
+import { withLogging } from '@/lib/logger';
 
-export async function POST(req: Request) {
+export const POST = withLogging(async function POST(req: Request) {
     const { messages, model }: { messages: UIMessage[], model: any } = await req.json();
 
     const result = streamText({
@@ -19,4 +19,4 @@ export async function POST(req: Request) {
     return createUIMessageStreamResponse({
         stream: toUIMessageStream({ stream: result.stream }),
     });
-}
+});
