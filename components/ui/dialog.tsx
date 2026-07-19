@@ -65,15 +65,14 @@ function DialogContent({
             render={
               <Button
                 variant="ghost"
-                className="absolute top-4 right-4 bg-secondary"
+                className="absolute top-4 right-4 bg-secondary text-muted-foreground hover:text-foreground"
                 size="icon-sm"
-              />
+              >
+                <IconX className="size-4" />
+                <span className="sr-only">Close</span>
+              </Button>
             }
-          >
-            <IconX
-            />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
+          />
         )}
       </DialogPrimitive.Popup>
     </DialogPortal>

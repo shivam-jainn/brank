@@ -16,7 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import type { ComponentProps, ReactNode } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
 
 export type ModelSelectorProps = ComponentProps<typeof Dialog>;
 
@@ -31,17 +31,20 @@ export const ModelSelectorTrigger = (props: ModelSelectorTriggerProps) => (
 );
 
 export type ModelSelectorContentProps = ComponentProps<typeof DialogContent> & {
+  commandProps?: ComponentProps<typeof Command>;
   title?: ReactNode;
 };
 
 export const ModelSelectorContent = ({
   className,
   children,
+  commandProps,
   title = "Model Selector",
   ...props
 }: ModelSelectorContentProps) => (
   <DialogContent
     aria-describedby={undefined}
+    showCloseButton={false}
     className={cn(
       "outline! border-none! p-0 outline-border! outline-solid!",
       className
@@ -49,7 +52,10 @@ export const ModelSelectorContent = ({
     {...props}
   >
     <DialogTitle className="sr-only">{title}</DialogTitle>
-    <Command className="**:data-[slot=command-input-wrapper]:h-auto">
+    <Command
+      {...commandProps}
+      className={cn("**:data-[slot=command-input-wrapper]:h-auto", commandProps?.className)}
+    >
       {children}
     </Command>
   </DialogContent>
@@ -109,8 +115,8 @@ export const ModelSelectorSeparator = (props: ModelSelectorSeparatorProps) => (
 );
 
 export type ModelSelectorLogoProps = Omit<
-  ComponentProps<"img">,
-  "src" | "alt"
+  ComponentProps<"span">,
+  "children"
 > & {
   provider:
     | "moonshotai-cn"
@@ -173,20 +179,61 @@ export type ModelSelectorLogoProps = Omit<
     | (string & {});
 };
 
+const providerLogoStyles: Record<string, string> = {
+  anthropic: "bg-[#d6c7b8] text-[#151515]",
+  google: "bg-[#4285f4] text-white",
+  groq: "bg-[#f55036] text-white",
+  lmstudio: "bg-[#74a742] text-white",
+  openai: "bg-[#10a37f] text-white",
+};
+
+const getProviderInitials = (provider: string) =>
+  provider
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "?";
+
 export const ModelSelectorLogo = ({
   provider,
   className,
   ...props
-}: ModelSelectorLogoProps) => (
-  <img
-    {...props}
-    alt={`${provider} logo`}
-    className={cn("size-3 dark:invert", className)}
-    height={12}
-    src={`https://models.dev/logos/${provider}.svg`}
-    width={12}
-  />
-);
+}: ModelSelectorLogoProps) => {
+  const [showImage, setShowImage] = useState(true);
+  const isLocalIcon = provider === "lmstudio";
+  const logoSrc = isLocalIcon
+    ? `/provider-icons/${provider}.svg`
+    : `https://models.dev/logos/${provider}.svg`;
+
+  return (
+    <span
+      {...props}
+      aria-label={`${provider} logo`}
+      className={cn(
+        "relative inline-flex size-3 shrink-0 items-center justify-center overflow-hidden rounded-full text-[0.55em] font-semibold leading-none",
+        providerLogoStyles[provider] ?? "bg-[#4f7cff] text-white",
+        className
+      )}
+      role="img"
+    >
+      <span aria-hidden="true" className={cn(showImage && "opacity-0")}>
+        {getProviderInitials(provider)}
+      </span>
+      {showImage && (
+        <img
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 size-full object-contain p-[18%]"
+          height={12}
+          onError={() => setShowImage(false)}
+          src={logoSrc}
+          width={12}
+        />
+      )}
+    </span>
+  );
+};
 
 export type ModelSelectorLogoGroupProps = ComponentProps<"div">;
 
@@ -196,7 +243,7 @@ export const ModelSelectorLogoGroup = ({
 }: ModelSelectorLogoGroupProps) => (
   <div
     className={cn(
-      "flex shrink-0 items-center -space-x-1 [&>img]:rounded-full [&>img]:bg-background [&>img]:p-px [&>img]:ring-1 dark:[&>img]:bg-foreground",
+      "flex shrink-0 items-center -space-x-1 [&>[role=img]]:ring-1 [&>[role=img]]:ring-background",
       className
     )}
     {...props}

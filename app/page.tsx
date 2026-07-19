@@ -1,12 +1,5 @@
-"use client";
-
-import { Shell } from "./components/shell";
-import { Chatbot } from "./components/chatbot";
+import { LandingPage } from "@/components/marketing/landing-page";
 
 export default function Home() {
-  return (
-    <Shell>
-      <Chatbot />
-    </Shell>
-  );
+  return <LandingPage />;
 }

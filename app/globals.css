@@ -123,10 +123,10 @@
 }
 
 .dark {
-  --background: oklch(0.14 0.008 250);
+  --background: #212121;
   --foreground: oklch(0.96 0.004 250);
 
-  --card: oklch(0.19 0.01 250);
+  --card: #303030;
   --card-foreground: oklch(0.96 0.004 250);
 
   --popover: oklch(0.19 0.01 250);
@@ -186,9 +186,16 @@
 
   body {
     @apply bg-background text-foreground;
+    margin: 0;
   }
 
   html {
     @apply font-sans;
+  }
+
+  [data-slot="command-input"]::-webkit-search-cancel-button,
+  [data-slot="command-input"]::-webkit-search-decoration {
+    appearance: none;
+    display: none;
   }
 }
