@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:inferhence": "bun test packages/inferhence/test"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.16",
