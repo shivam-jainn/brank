@@ -1,3 +1,4 @@
+import redact from "@pinojs/redact";
 import type { RedactionOptions, RedactionRule, RedactedPreview } from "./types";
 
 const DEFAULT_MAX_PREVIEW_CHARS = 512;
@@ -33,15 +34,101 @@ export type RedactionResult = {
   truncated: boolean;
 };
 
+interface RedactedResult extends Record<string, unknown> {
+  restore?: () => unknown;
+}
+
+function buildRedactPaths(sensitiveKeys: Set<string>): string[] {
+  const paths: string[] = [];
+  for (const key of sensitiveKeys) {
+    paths.push(
+      key,
+      `*.${key}`,
+      `*[*].${key}`,
+      `*.*.${key}`,
+      `*.[*].${key}`,
+      `*.*.*.${key}`,
+      `*.*.[*].${key}`,
+      `*.*.*.*.${key}`,
+      `*.*.*.[*].${key}`
+    );
+  }
+  return paths;
+}
+
+function createRedactor(sensitiveKeys: Set<string>) {
+  return redact({
+    paths: buildRedactPaths(sensitiveKeys),
+    censor: "[REDACTED:key]",
+    serialize: false,
+  });
+}
+
+function redactKeys(value: unknown, sensitiveKeys: Set<string>): { value: unknown; redactionCount: number } {
+  if (!value || typeof value !== "object") {
+    return { value, redactionCount: 0 };
+  }
+
+  let cloned: unknown;
+  try {
+    cloned = JSON.parse(JSON.stringify(value));
+  } catch {
+    cloned = value;
+  }
+
+  const redactFn = createRedactor(sensitiveKeys);
+  const redacted = redactFn(cloned) as RedactedResult;
+
+  let redactionCount = 0;
+  const restoreFn = redacted.restore;
+  if (restoreFn) {
+    const original = restoreFn();
+    redactionCount = countRedactedKeys(original, redacted);
+  }
+
+  return { value: redacted, redactionCount };
+}
+
+function countRedactedKeys(original: unknown, redacted: unknown): number {
+  if (!original || typeof original !== "object" || !redacted || typeof redacted !== "object") {
+    return 0;
+  }
+
+  if (Array.isArray(original) && Array.isArray(redacted)) {
+    return original.reduce((count, item, index) => count + countRedactedKeys(item, redacted[index]), 0);
+  }
+
+  if (Array.isArray(original) || Array.isArray(redacted)) {
+    return 0;
+  }
+
+  const originalObj = original as Record<string, unknown>;
+  const redactedObj = redacted as Record<string, unknown>;
+
+  let count = 0;
+  for (const key of Object.keys(redactedObj)) {
+    const originalValue = originalObj[key];
+    const redactedValue = redactedObj[key];
+
+    if (redactedValue === "[REDACTED:key]") {
+      count += 1;
+    } else if (originalValue && typeof originalValue === "object" && redactedValue && typeof redactedValue === "object") {
+      count += countRedactedKeys(originalValue, redactedValue);
+    }
+  }
+
+  return count;
+}
+
 export function redactPreview(value: unknown, options: RedactionOptions = {}): RedactionResult {
   if (options.allowRaw) {
     return truncatePreview(stringifyPreview(value), options.maxPreviewChars);
   }
 
   const sensitiveKeys = new Set([...(options.sensitiveKeys ?? []), ...DEFAULT_SENSITIVE_KEYS]);
-  const normalized = maskSensitiveObjectKeys(value, sensitiveKeys);
+  const { value: normalized, redactionCount: keyRedactionCount } = redactKeys(value, sensitiveKeys);
   let text = stringifyPreview(normalized);
-  let redactionCount = 0;
+  let redactionCount = keyRedactionCount;
 
   for (const rule of [...BUILT_IN_RULES, ...(options.customRules ?? [])]) {
     text = text.replace(rule.pattern, () => {
@@ -53,7 +140,7 @@ export function redactPreview(value: unknown, options: RedactionOptions = {}): R
   const truncated = truncatePreview(text, options.maxPreviewChars);
   return {
     value: truncated.value,
-    redactionCount: redactionCount + countMaskedKeys(normalized),
+    redactionCount: redactionCount + truncated.redactionCount,
     truncated: truncated.truncated,
   };
 }
@@ -101,39 +188,4 @@ function stringifyPreview(value: unknown): string {
   } catch {
     return String(value);
   }
-}
-
-function maskSensitiveObjectKeys(value: unknown, sensitiveKeys: Set<string>): unknown {
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((item) => maskSensitiveObjectKeys(item, sensitiveKeys));
-  }
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, nested]) => {
-      if (sensitiveKeys.has(key) || sensitiveKeys.has(key.toLowerCase())) {
-        return [key, "[REDACTED:key]"];
-      }
-
-      return [key, maskSensitiveObjectKeys(nested, sensitiveKeys)];
-    }),
-  );
-}
-
-function countMaskedKeys(value: unknown): number {
-  if (!value || typeof value !== "object") {
-    return 0;
-  }
-
-  if (Array.isArray(value)) {
-    return value.reduce((count, item) => count + countMaskedKeys(item), 0);
-  }
-
-  return Object.values(value as Record<string, unknown>).reduce<number>(
-    (count, item) => count + (item === "[REDACTED:key]" ? 1 : countMaskedKeys(item)),
-    0,
-  );
 }

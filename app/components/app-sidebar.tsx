@@ -16,7 +16,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeftIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { signOut } from "@/lib/auth-client";
+import { hardSignOut } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -110,7 +110,7 @@ export function AppSidebar({
   }, [router]);
 
   const handleLogout = useCallback(async () => {
-    const result = await signOut();
+    const result = await hardSignOut();
 
     if (result.error) {
       toast.error(result.error.message ?? "Could not sign out.");

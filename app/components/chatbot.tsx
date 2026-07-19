@@ -91,7 +91,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
-import { signOut } from "@/lib/auth-client";
+import { hardSignOut } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import { SettingsDialog, readProviderKeys } from "./settings-dialog";
 import { AppSidebar } from "./app-sidebar";
@@ -815,7 +815,7 @@ export function Chatbot() {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
 
-    const result = await signOut();
+    const result = await hardSignOut();
 
     if (result.error) {
       toast.error(result.error.message ?? "Could not sign out.");

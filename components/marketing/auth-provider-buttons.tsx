@@ -6,7 +6,7 @@ import { ArrowRightIcon, LogOutIcon, UserRoundIcon } from "lucide-react";
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button";
-import { authClient, signIn, signOut, useSession } from "@/lib/auth-client";
+import { authClient, hardSignOut, signIn, useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
 type ProviderId = "google" | "github";
@@ -82,7 +82,7 @@ export function AuthProviderButtons({
     setPending("signout");
     setError(null);
 
-    const result = await signOut();
+    const result = await hardSignOut();
 
     if (result.error) {
       setError(result.error.message ?? "Could not sign out.");

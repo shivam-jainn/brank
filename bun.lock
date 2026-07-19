@@ -73,6 +73,9 @@
     "packages/inferhence": {
       "name": "@brank/inferhence",
       "version": "0.0.0",
+      "dependencies": {
+        "@pinojs/redact": "^0.4.0",
+      },
     },
     "packages/ingestion": {
       "name": "@brank/ingestion",
