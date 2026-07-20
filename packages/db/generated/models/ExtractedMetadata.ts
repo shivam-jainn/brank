@@ -252,8 +252,8 @@ export type ExtractedMetadataWhereInput = {
   confidence?: Prisma.FloatNullableFilter<"ExtractedMetadata"> | number | null
   source?: Prisma.EnumMetadataSourceFilter<"ExtractedMetadata"> | $Enums.MetadataSource
   createdAt?: Prisma.DateTimeFilter<"ExtractedMetadata"> | Date | string
-  conversation?: Prisma.XOR<Prisma.ConversationNullableScalarRelationFilter, Prisma.ConversationWhereInput> | null
   chatMessage?: Prisma.XOR<Prisma.ChatMessageNullableScalarRelationFilter, Prisma.ChatMessageWhereInput> | null
+  conversation?: Prisma.XOR<Prisma.ConversationNullableScalarRelationFilter, Prisma.ConversationWhereInput> | null
   inferenceEvent?: Prisma.XOR<Prisma.InferenceEventNullableScalarRelationFilter, Prisma.InferenceEventWhereInput> | null
 }
 
@@ -268,8 +268,8 @@ export type ExtractedMetadataOrderByWithRelationInput = {
   confidence?: Prisma.SortOrderInput | Prisma.SortOrder
   source?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
-  conversation?: Prisma.ConversationOrderByWithRelationInput
   chatMessage?: Prisma.ChatMessageOrderByWithRelationInput
+  conversation?: Prisma.ConversationOrderByWithRelationInput
   inferenceEvent?: Prisma.InferenceEventOrderByWithRelationInput
 }
 
@@ -287,8 +287,8 @@ export type ExtractedMetadataWhereUniqueInput = Prisma.AtLeast<{
   confidence?: Prisma.FloatNullableFilter<"ExtractedMetadata"> | number | null
   source?: Prisma.EnumMetadataSourceFilter<"ExtractedMetadata"> | $Enums.MetadataSource
   createdAt?: Prisma.DateTimeFilter<"ExtractedMetadata"> | Date | string
-  conversation?: Prisma.XOR<Prisma.ConversationNullableScalarRelationFilter, Prisma.ConversationWhereInput> | null
   chatMessage?: Prisma.XOR<Prisma.ChatMessageNullableScalarRelationFilter, Prisma.ChatMessageWhereInput> | null
+  conversation?: Prisma.XOR<Prisma.ConversationNullableScalarRelationFilter, Prisma.ConversationWhereInput> | null
   inferenceEvent?: Prisma.XOR<Prisma.InferenceEventNullableScalarRelationFilter, Prisma.InferenceEventWhereInput> | null
 }, "id">
 
@@ -334,8 +334,8 @@ export type ExtractedMetadataCreateInput = {
   confidence?: number | null
   source: $Enums.MetadataSource
   createdAt?: Date | string
-  conversation?: Prisma.ConversationCreateNestedOneWithoutMetadataInput
   chatMessage?: Prisma.ChatMessageCreateNestedOneWithoutMetadataInput
+  conversation?: Prisma.ConversationCreateNestedOneWithoutMetadataInput
   inferenceEvent?: Prisma.InferenceEventCreateNestedOneWithoutExtractedMetadataInput
 }
 
@@ -360,8 +360,8 @@ export type ExtractedMetadataUpdateInput = {
   confidence?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   source?: Prisma.EnumMetadataSourceFieldUpdateOperationsInput | $Enums.MetadataSource
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  conversation?: Prisma.ConversationUpdateOneWithoutMetadataNestedInput
   chatMessage?: Prisma.ChatMessageUpdateOneWithoutMetadataNestedInput
+  conversation?: Prisma.ConversationUpdateOneWithoutMetadataNestedInput
   inferenceEvent?: Prisma.InferenceEventUpdateOneWithoutExtractedMetadataNestedInput
 }
 
@@ -731,8 +731,8 @@ export type ExtractedMetadataCreateWithoutInferenceEventInput = {
   confidence?: number | null
   source: $Enums.MetadataSource
   createdAt?: Date | string
-  conversation?: Prisma.ConversationCreateNestedOneWithoutMetadataInput
   chatMessage?: Prisma.ChatMessageCreateNestedOneWithoutMetadataInput
+  conversation?: Prisma.ConversationCreateNestedOneWithoutMetadataInput
 }
 
 export type ExtractedMetadataUncheckedCreateWithoutInferenceEventInput = {
@@ -889,8 +889,8 @@ export type ExtractedMetadataUpdateWithoutInferenceEventInput = {
   confidence?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   source?: Prisma.EnumMetadataSourceFieldUpdateOperationsInput | $Enums.MetadataSource
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  conversation?: Prisma.ConversationUpdateOneWithoutMetadataNestedInput
   chatMessage?: Prisma.ChatMessageUpdateOneWithoutMetadataNestedInput
+  conversation?: Prisma.ConversationUpdateOneWithoutMetadataNestedInput
 }
 
 export type ExtractedMetadataUncheckedUpdateWithoutInferenceEventInput = {
@@ -930,8 +930,8 @@ export type ExtractedMetadataSelect<ExtArgs extends runtime.Types.Extensions.Int
   confidence?: boolean
   source?: boolean
   createdAt?: boolean
-  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   chatMessage?: boolean | Prisma.ExtractedMetadata$chatMessageArgs<ExtArgs>
+  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   inferenceEvent?: boolean | Prisma.ExtractedMetadata$inferenceEventArgs<ExtArgs>
 }, ExtArgs["result"]["extractedMetadata"]>
 
@@ -946,8 +946,8 @@ export type ExtractedMetadataSelectCreateManyAndReturn<ExtArgs extends runtime.T
   confidence?: boolean
   source?: boolean
   createdAt?: boolean
-  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   chatMessage?: boolean | Prisma.ExtractedMetadata$chatMessageArgs<ExtArgs>
+  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   inferenceEvent?: boolean | Prisma.ExtractedMetadata$inferenceEventArgs<ExtArgs>
 }, ExtArgs["result"]["extractedMetadata"]>
 
@@ -962,8 +962,8 @@ export type ExtractedMetadataSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   confidence?: boolean
   source?: boolean
   createdAt?: boolean
-  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   chatMessage?: boolean | Prisma.ExtractedMetadata$chatMessageArgs<ExtArgs>
+  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   inferenceEvent?: boolean | Prisma.ExtractedMetadata$inferenceEventArgs<ExtArgs>
 }, ExtArgs["result"]["extractedMetadata"]>
 
@@ -982,26 +982,26 @@ export type ExtractedMetadataSelectScalar = {
 
 export type ExtractedMetadataOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "conversationId" | "chatMessageId" | "inferenceEventId" | "namespace" | "key" | "value" | "confidence" | "source" | "createdAt", ExtArgs["result"]["extractedMetadata"]>
 export type ExtractedMetadataInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   chatMessage?: boolean | Prisma.ExtractedMetadata$chatMessageArgs<ExtArgs>
+  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   inferenceEvent?: boolean | Prisma.ExtractedMetadata$inferenceEventArgs<ExtArgs>
 }
 export type ExtractedMetadataIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   chatMessage?: boolean | Prisma.ExtractedMetadata$chatMessageArgs<ExtArgs>
+  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   inferenceEvent?: boolean | Prisma.ExtractedMetadata$inferenceEventArgs<ExtArgs>
 }
 export type ExtractedMetadataIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   chatMessage?: boolean | Prisma.ExtractedMetadata$chatMessageArgs<ExtArgs>
+  conversation?: boolean | Prisma.ExtractedMetadata$conversationArgs<ExtArgs>
   inferenceEvent?: boolean | Prisma.ExtractedMetadata$inferenceEventArgs<ExtArgs>
 }
 
 export type $ExtractedMetadataPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ExtractedMetadata"
   objects: {
-    conversation: Prisma.$ConversationPayload<ExtArgs> | null
     chatMessage: Prisma.$ChatMessagePayload<ExtArgs> | null
+    conversation: Prisma.$ConversationPayload<ExtArgs> | null
     inferenceEvent: Prisma.$InferenceEventPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -1409,8 +1409,8 @@ readonly fields: ExtractedMetadataFieldRefs;
  */
 export interface Prisma__ExtractedMetadataClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  conversation<T extends Prisma.ExtractedMetadata$conversationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExtractedMetadata$conversationArgs<ExtArgs>>): Prisma.Prisma__ConversationClient<runtime.Types.Result.GetResult<Prisma.$ConversationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   chatMessage<T extends Prisma.ExtractedMetadata$chatMessageArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExtractedMetadata$chatMessageArgs<ExtArgs>>): Prisma.Prisma__ChatMessageClient<runtime.Types.Result.GetResult<Prisma.$ChatMessagePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  conversation<T extends Prisma.ExtractedMetadata$conversationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExtractedMetadata$conversationArgs<ExtArgs>>): Prisma.Prisma__ConversationClient<runtime.Types.Result.GetResult<Prisma.$ConversationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   inferenceEvent<T extends Prisma.ExtractedMetadata$inferenceEventArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ExtractedMetadata$inferenceEventArgs<ExtArgs>>): Prisma.Prisma__InferenceEventClient<runtime.Types.Result.GetResult<Prisma.$InferenceEventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1852,25 +1852,6 @@ export type ExtractedMetadataDeleteManyArgs<ExtArgs extends runtime.Types.Extens
 }
 
 /**
- * ExtractedMetadata.conversation
- */
-export type ExtractedMetadata$conversationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Conversation
-   */
-  select?: Prisma.ConversationSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the Conversation
-   */
-  omit?: Prisma.ConversationOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ConversationInclude<ExtArgs> | null
-  where?: Prisma.ConversationWhereInput
-}
-
-/**
  * ExtractedMetadata.chatMessage
  */
 export type ExtractedMetadata$chatMessageArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1887,6 +1868,25 @@ export type ExtractedMetadata$chatMessageArgs<ExtArgs extends runtime.Types.Exte
    */
   include?: Prisma.ChatMessageInclude<ExtArgs> | null
   where?: Prisma.ChatMessageWhereInput
+}
+
+/**
+ * ExtractedMetadata.conversation
+ */
+export type ExtractedMetadata$conversationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Conversation
+   */
+  select?: Prisma.ConversationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Conversation
+   */
+  omit?: Prisma.ConversationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ConversationInclude<ExtArgs> | null
+  where?: Prisma.ConversationWhereInput
 }
 
 /**

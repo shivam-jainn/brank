@@ -8,16 +8,16 @@ datasource db {
 }
 
 model Conversation {
-  id        String   @id @default(uuid())
-  sessionId String?
-  userId    String?
-  title     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id              String              @id @default(uuid())
+  sessionId       String?
+  title           String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  userId          String
   messages        ChatMessage[]
-  inferenceEvents InferenceEvent[]
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   metadata        ExtractedMetadata[]
+  inferenceEvents InferenceEvent[]
 
   @@index([sessionId, updatedAt])
   @@index([userId, updatedAt])
@@ -25,7 +25,7 @@ model Conversation {
 }
 
 model ChatMessage {
-  id             String   @id
+  id             String              @id
   conversationId String
   role           MessageRole
   sequence       Int
@@ -36,10 +36,9 @@ model ChatMessage {
   model          String?
   requestId      String?
   traceId        String?
-  createdAt      DateTime @default(now())
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  metadata     ExtractedMetadata[]
+  createdAt      DateTime            @default(now())
+  conversation   Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  metadata       ExtractedMetadata[]
 
   @@unique([conversationId, sequence])
   @@index([conversationId, createdAt])
@@ -48,37 +47,37 @@ model ChatMessage {
 }
 
 model InferenceEvent {
-  id             String          @id
-  conversationId String?
-  sessionId      String?
-  userId         String?
-  traceId        String?
-  requestId      String?
-  eventType      InferenceEventType
-  status         InferenceStatus
-  sequence       Int
-  provider       String
-  model          String
-  operation      String?
-  startedAt      DateTime
-  emittedAt      DateTime
-  completedAt    DateTime?
-  latencyMs      Int?
-  inputTokens    Int?
-  outputTokens   Int?
-  totalTokens    Int?
-  metadata       Json
-  previews       Json
-  error          Json?
-  rawEvent       Json
-  receivedAt     DateTime
-  queuedAt       DateTime
+  id                  String              @id
+  conversationId      String?
+  sessionId           String?
+  traceId             String?
+  requestId           String?
+  eventType           InferenceEventType
+  status              InferenceStatus
+  sequence            Int
+  provider            String
+  model               String
+  operation           String?
+  startedAt           DateTime
+  emittedAt           DateTime
+  completedAt         DateTime?
+  latencyMs           Int?
+  inputTokens         Int?
+  outputTokens        Int?
+  totalTokens         Int?
+  metadata            Json
+  previews            Json
+  error               Json?
+  rawEvent            Json
+  receivedAt          DateTime
+  queuedAt            DateTime
   processingStartedAt DateTime?
-  persistedAt    DateTime @default(now())
-  attempts       Int      @default(0)
-
-  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
-  extractedMetadata ExtractedMetadata[]
+  persistedAt         DateTime            @default(now())
+  attempts            Int                 @default(0)
+  userId              String
+  extractedMetadata   ExtractedMetadata[]
+  conversation        Conversation?       @relation(fields: [conversationId], references: [id])
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, emittedAt])
   @@index([traceId, sequence])
@@ -90,7 +89,7 @@ model InferenceEvent {
 }
 
 model ExtractedMetadata {
-  id               String       @id @default(uuid())
+  id               String          @id @default(uuid())
   conversationId   String?
   chatMessageId    String?
   inferenceEventId String?
@@ -99,11 +98,10 @@ model ExtractedMetadata {
   value            Json
   confidence       Float?
   source           MetadataSource
-  createdAt        DateTime     @default(now())
-
-  conversation   Conversation?   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  chatMessage    ChatMessage?    @relation(fields: [chatMessageId], references: [id], onDelete: Cascade)
-  inferenceEvent InferenceEvent? @relation(fields: [inferenceEventId], references: [id], onDelete: Cascade)
+  createdAt        DateTime        @default(now())
+  chatMessage      ChatMessage?    @relation(fields: [chatMessageId], references: [id], onDelete: Cascade)
+  conversation     Conversation?   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  inferenceEvent   InferenceEvent? @relation(fields: [inferenceEventId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, namespace, key])
   @@index([chatMessageId])
@@ -112,25 +110,26 @@ model ExtractedMetadata {
 }
 
 model User {
-  id            String    @id
+  id            String         @id
   name          String
-  email         String
+  email         String         @unique
   emailVerified Boolean
   image         String?
-  isAnonymous   Boolean?  @default(false)
+  isAnonymous   Boolean?       @default(false)
   createdAt     DateTime
   updatedAt     DateTime
-  sessions      Session[]
+  conversations Conversation[]
+  inferenceEvents InferenceEvent[]
   accounts      Account[]
+  sessions      Session[]
 
-  @@unique([email])
   @@map("user")
 }
 
 model Session {
   id        String   @id
   expiresAt DateTime
-  token     String
+  token     String   @unique
   createdAt DateTime
   updatedAt DateTime
   ipAddress String?
@@ -138,7 +137,6 @@ model Session {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([token])
   @@index([userId])
   @@map("session")
 }
@@ -148,7 +146,6 @@ model Account {
   accountId             String
   providerId            String
   userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accessToken           String?
   refreshToken          String?
   idToken               String?
@@ -158,6 +155,7 @@ model Account {
   password              String?
   createdAt             DateTime
   updatedAt             DateTime
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("account")

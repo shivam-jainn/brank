@@ -48,7 +48,6 @@ export type InferenceEventMinAggregateOutputType = {
   id: string | null
   conversationId: string | null
   sessionId: string | null
-  userId: string | null
   traceId: string | null
   requestId: string | null
   eventType: $Enums.InferenceEventType | null
@@ -69,13 +68,13 @@ export type InferenceEventMinAggregateOutputType = {
   processingStartedAt: Date | null
   persistedAt: Date | null
   attempts: number | null
+  userId: string | null
 }
 
 export type InferenceEventMaxAggregateOutputType = {
   id: string | null
   conversationId: string | null
   sessionId: string | null
-  userId: string | null
   traceId: string | null
   requestId: string | null
   eventType: $Enums.InferenceEventType | null
@@ -96,13 +95,13 @@ export type InferenceEventMaxAggregateOutputType = {
   processingStartedAt: Date | null
   persistedAt: Date | null
   attempts: number | null
+  userId: string | null
 }
 
 export type InferenceEventCountAggregateOutputType = {
   id: number
   conversationId: number
   sessionId: number
-  userId: number
   traceId: number
   requestId: number
   eventType: number
@@ -127,6 +126,7 @@ export type InferenceEventCountAggregateOutputType = {
   processingStartedAt: number
   persistedAt: number
   attempts: number
+  userId: number
   _all: number
 }
 
@@ -153,7 +153,6 @@ export type InferenceEventMinAggregateInputType = {
   id?: true
   conversationId?: true
   sessionId?: true
-  userId?: true
   traceId?: true
   requestId?: true
   eventType?: true
@@ -174,13 +173,13 @@ export type InferenceEventMinAggregateInputType = {
   processingStartedAt?: true
   persistedAt?: true
   attempts?: true
+  userId?: true
 }
 
 export type InferenceEventMaxAggregateInputType = {
   id?: true
   conversationId?: true
   sessionId?: true
-  userId?: true
   traceId?: true
   requestId?: true
   eventType?: true
@@ -201,13 +200,13 @@ export type InferenceEventMaxAggregateInputType = {
   processingStartedAt?: true
   persistedAt?: true
   attempts?: true
+  userId?: true
 }
 
 export type InferenceEventCountAggregateInputType = {
   id?: true
   conversationId?: true
   sessionId?: true
-  userId?: true
   traceId?: true
   requestId?: true
   eventType?: true
@@ -232,6 +231,7 @@ export type InferenceEventCountAggregateInputType = {
   processingStartedAt?: true
   persistedAt?: true
   attempts?: true
+  userId?: true
   _all?: true
 }
 
@@ -325,7 +325,6 @@ export type InferenceEventGroupByOutputType = {
   id: string
   conversationId: string | null
   sessionId: string | null
-  userId: string | null
   traceId: string | null
   requestId: string | null
   eventType: $Enums.InferenceEventType
@@ -350,6 +349,7 @@ export type InferenceEventGroupByOutputType = {
   processingStartedAt: Date | null
   persistedAt: Date
   attempts: number
+  userId: string
   _count: InferenceEventCountAggregateOutputType | null
   _avg: InferenceEventAvgAggregateOutputType | null
   _sum: InferenceEventSumAggregateOutputType | null
@@ -379,7 +379,6 @@ export type InferenceEventWhereInput = {
   id?: Prisma.StringFilter<"InferenceEvent"> | string
   conversationId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   sessionId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
-  userId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   traceId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   requestId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   eventType?: Prisma.EnumInferenceEventTypeFilter<"InferenceEvent"> | $Enums.InferenceEventType
@@ -404,15 +403,16 @@ export type InferenceEventWhereInput = {
   processingStartedAt?: Prisma.DateTimeNullableFilter<"InferenceEvent"> | Date | string | null
   persistedAt?: Prisma.DateTimeFilter<"InferenceEvent"> | Date | string
   attempts?: Prisma.IntFilter<"InferenceEvent"> | number
-  conversation?: Prisma.XOR<Prisma.ConversationNullableScalarRelationFilter, Prisma.ConversationWhereInput> | null
+  userId?: Prisma.StringFilter<"InferenceEvent"> | string
   extractedMetadata?: Prisma.ExtractedMetadataListRelationFilter
+  conversation?: Prisma.XOR<Prisma.ConversationNullableScalarRelationFilter, Prisma.ConversationWhereInput> | null
+  user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }
 
 export type InferenceEventOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   conversationId?: Prisma.SortOrderInput | Prisma.SortOrder
   sessionId?: Prisma.SortOrderInput | Prisma.SortOrder
-  userId?: Prisma.SortOrderInput | Prisma.SortOrder
   traceId?: Prisma.SortOrderInput | Prisma.SortOrder
   requestId?: Prisma.SortOrderInput | Prisma.SortOrder
   eventType?: Prisma.SortOrder
@@ -437,8 +437,10 @@ export type InferenceEventOrderByWithRelationInput = {
   processingStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   persistedAt?: Prisma.SortOrder
   attempts?: Prisma.SortOrder
-  conversation?: Prisma.ConversationOrderByWithRelationInput
+  userId?: Prisma.SortOrder
   extractedMetadata?: Prisma.ExtractedMetadataOrderByRelationAggregateInput
+  conversation?: Prisma.ConversationOrderByWithRelationInput
+  user?: Prisma.UserOrderByWithRelationInput
 }
 
 export type InferenceEventWhereUniqueInput = Prisma.AtLeast<{
@@ -448,7 +450,6 @@ export type InferenceEventWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.InferenceEventWhereInput | Prisma.InferenceEventWhereInput[]
   conversationId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   sessionId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
-  userId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   traceId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   requestId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   eventType?: Prisma.EnumInferenceEventTypeFilter<"InferenceEvent"> | $Enums.InferenceEventType
@@ -473,15 +474,16 @@ export type InferenceEventWhereUniqueInput = Prisma.AtLeast<{
   processingStartedAt?: Prisma.DateTimeNullableFilter<"InferenceEvent"> | Date | string | null
   persistedAt?: Prisma.DateTimeFilter<"InferenceEvent"> | Date | string
   attempts?: Prisma.IntFilter<"InferenceEvent"> | number
-  conversation?: Prisma.XOR<Prisma.ConversationNullableScalarRelationFilter, Prisma.ConversationWhereInput> | null
+  userId?: Prisma.StringFilter<"InferenceEvent"> | string
   extractedMetadata?: Prisma.ExtractedMetadataListRelationFilter
+  conversation?: Prisma.XOR<Prisma.ConversationNullableScalarRelationFilter, Prisma.ConversationWhereInput> | null
+  user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
 }, "id">
 
 export type InferenceEventOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   conversationId?: Prisma.SortOrderInput | Prisma.SortOrder
   sessionId?: Prisma.SortOrderInput | Prisma.SortOrder
-  userId?: Prisma.SortOrderInput | Prisma.SortOrder
   traceId?: Prisma.SortOrderInput | Prisma.SortOrder
   requestId?: Prisma.SortOrderInput | Prisma.SortOrder
   eventType?: Prisma.SortOrder
@@ -506,6 +508,7 @@ export type InferenceEventOrderByWithAggregationInput = {
   processingStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   persistedAt?: Prisma.SortOrder
   attempts?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   _count?: Prisma.InferenceEventCountOrderByAggregateInput
   _avg?: Prisma.InferenceEventAvgOrderByAggregateInput
   _max?: Prisma.InferenceEventMaxOrderByAggregateInput
@@ -520,7 +523,6 @@ export type InferenceEventScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"InferenceEvent"> | string
   conversationId?: Prisma.StringNullableWithAggregatesFilter<"InferenceEvent"> | string | null
   sessionId?: Prisma.StringNullableWithAggregatesFilter<"InferenceEvent"> | string | null
-  userId?: Prisma.StringNullableWithAggregatesFilter<"InferenceEvent"> | string | null
   traceId?: Prisma.StringNullableWithAggregatesFilter<"InferenceEvent"> | string | null
   requestId?: Prisma.StringNullableWithAggregatesFilter<"InferenceEvent"> | string | null
   eventType?: Prisma.EnumInferenceEventTypeWithAggregatesFilter<"InferenceEvent"> | $Enums.InferenceEventType
@@ -545,12 +547,12 @@ export type InferenceEventScalarWhereWithAggregatesInput = {
   processingStartedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"InferenceEvent"> | Date | string | null
   persistedAt?: Prisma.DateTimeWithAggregatesFilter<"InferenceEvent"> | Date | string
   attempts?: Prisma.IntWithAggregatesFilter<"InferenceEvent"> | number
+  userId?: Prisma.StringWithAggregatesFilter<"InferenceEvent"> | string
 }
 
 export type InferenceEventCreateInput = {
   id: string
   sessionId?: string | null
-  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -575,15 +577,15 @@ export type InferenceEventCreateInput = {
   processingStartedAt?: Date | string | null
   persistedAt?: Date | string
   attempts?: number
-  conversation?: Prisma.ConversationCreateNestedOneWithoutInferenceEventsInput
   extractedMetadata?: Prisma.ExtractedMetadataCreateNestedManyWithoutInferenceEventInput
+  conversation?: Prisma.ConversationCreateNestedOneWithoutInferenceEventsInput
+  user: Prisma.UserCreateNestedOneWithoutInferenceEventsInput
 }
 
 export type InferenceEventUncheckedCreateInput = {
   id: string
   conversationId?: string | null
   sessionId?: string | null
-  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -608,13 +610,13 @@ export type InferenceEventUncheckedCreateInput = {
   processingStartedAt?: Date | string | null
   persistedAt?: Date | string
   attempts?: number
+  userId: string
   extractedMetadata?: Prisma.ExtractedMetadataUncheckedCreateNestedManyWithoutInferenceEventInput
 }
 
 export type InferenceEventUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -639,15 +641,15 @@ export type InferenceEventUpdateInput = {
   processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   persistedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
-  conversation?: Prisma.ConversationUpdateOneWithoutInferenceEventsNestedInput
   extractedMetadata?: Prisma.ExtractedMetadataUpdateManyWithoutInferenceEventNestedInput
+  conversation?: Prisma.ConversationUpdateOneWithoutInferenceEventsNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutInferenceEventsNestedInput
 }
 
 export type InferenceEventUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   conversationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -672,6 +674,7 @@ export type InferenceEventUncheckedUpdateInput = {
   processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   persistedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
   extractedMetadata?: Prisma.ExtractedMetadataUncheckedUpdateManyWithoutInferenceEventNestedInput
 }
 
@@ -679,7 +682,6 @@ export type InferenceEventCreateManyInput = {
   id: string
   conversationId?: string | null
   sessionId?: string | null
-  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -704,12 +706,12 @@ export type InferenceEventCreateManyInput = {
   processingStartedAt?: Date | string | null
   persistedAt?: Date | string
   attempts?: number
+  userId: string
 }
 
 export type InferenceEventUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -740,7 +742,6 @@ export type InferenceEventUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   conversationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -765,6 +766,7 @@ export type InferenceEventUncheckedUpdateManyInput = {
   processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   persistedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
 }
 
 export type InferenceEventListRelationFilter = {
@@ -781,7 +783,6 @@ export type InferenceEventCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   sessionId?: Prisma.SortOrder
-  userId?: Prisma.SortOrder
   traceId?: Prisma.SortOrder
   requestId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
@@ -806,6 +807,7 @@ export type InferenceEventCountOrderByAggregateInput = {
   processingStartedAt?: Prisma.SortOrder
   persistedAt?: Prisma.SortOrder
   attempts?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
 }
 
 export type InferenceEventAvgOrderByAggregateInput = {
@@ -821,7 +823,6 @@ export type InferenceEventMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   sessionId?: Prisma.SortOrder
-  userId?: Prisma.SortOrder
   traceId?: Prisma.SortOrder
   requestId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
@@ -842,13 +843,13 @@ export type InferenceEventMaxOrderByAggregateInput = {
   processingStartedAt?: Prisma.SortOrder
   persistedAt?: Prisma.SortOrder
   attempts?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
 }
 
 export type InferenceEventMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   sessionId?: Prisma.SortOrder
-  userId?: Prisma.SortOrder
   traceId?: Prisma.SortOrder
   requestId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
@@ -869,6 +870,7 @@ export type InferenceEventMinOrderByAggregateInput = {
   processingStartedAt?: Prisma.SortOrder
   persistedAt?: Prisma.SortOrder
   attempts?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
 }
 
 export type InferenceEventSumOrderByAggregateInput = {
@@ -963,10 +965,51 @@ export type InferenceEventUpdateOneWithoutExtractedMetadataNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.InferenceEventUpdateToOneWithWhereWithoutExtractedMetadataInput, Prisma.InferenceEventUpdateWithoutExtractedMetadataInput>, Prisma.InferenceEventUncheckedUpdateWithoutExtractedMetadataInput>
 }
 
+export type InferenceEventCreateNestedManyWithoutUserInput = {
+  create?: Prisma.XOR<Prisma.InferenceEventCreateWithoutUserInput, Prisma.InferenceEventUncheckedCreateWithoutUserInput> | Prisma.InferenceEventCreateWithoutUserInput[] | Prisma.InferenceEventUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.InferenceEventCreateOrConnectWithoutUserInput | Prisma.InferenceEventCreateOrConnectWithoutUserInput[]
+  createMany?: Prisma.InferenceEventCreateManyUserInputEnvelope
+  connect?: Prisma.InferenceEventWhereUniqueInput | Prisma.InferenceEventWhereUniqueInput[]
+}
+
+export type InferenceEventUncheckedCreateNestedManyWithoutUserInput = {
+  create?: Prisma.XOR<Prisma.InferenceEventCreateWithoutUserInput, Prisma.InferenceEventUncheckedCreateWithoutUserInput> | Prisma.InferenceEventCreateWithoutUserInput[] | Prisma.InferenceEventUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.InferenceEventCreateOrConnectWithoutUserInput | Prisma.InferenceEventCreateOrConnectWithoutUserInput[]
+  createMany?: Prisma.InferenceEventCreateManyUserInputEnvelope
+  connect?: Prisma.InferenceEventWhereUniqueInput | Prisma.InferenceEventWhereUniqueInput[]
+}
+
+export type InferenceEventUpdateManyWithoutUserNestedInput = {
+  create?: Prisma.XOR<Prisma.InferenceEventCreateWithoutUserInput, Prisma.InferenceEventUncheckedCreateWithoutUserInput> | Prisma.InferenceEventCreateWithoutUserInput[] | Prisma.InferenceEventUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.InferenceEventCreateOrConnectWithoutUserInput | Prisma.InferenceEventCreateOrConnectWithoutUserInput[]
+  upsert?: Prisma.InferenceEventUpsertWithWhereUniqueWithoutUserInput | Prisma.InferenceEventUpsertWithWhereUniqueWithoutUserInput[]
+  createMany?: Prisma.InferenceEventCreateManyUserInputEnvelope
+  set?: Prisma.InferenceEventWhereUniqueInput | Prisma.InferenceEventWhereUniqueInput[]
+  disconnect?: Prisma.InferenceEventWhereUniqueInput | Prisma.InferenceEventWhereUniqueInput[]
+  delete?: Prisma.InferenceEventWhereUniqueInput | Prisma.InferenceEventWhereUniqueInput[]
+  connect?: Prisma.InferenceEventWhereUniqueInput | Prisma.InferenceEventWhereUniqueInput[]
+  update?: Prisma.InferenceEventUpdateWithWhereUniqueWithoutUserInput | Prisma.InferenceEventUpdateWithWhereUniqueWithoutUserInput[]
+  updateMany?: Prisma.InferenceEventUpdateManyWithWhereWithoutUserInput | Prisma.InferenceEventUpdateManyWithWhereWithoutUserInput[]
+  deleteMany?: Prisma.InferenceEventScalarWhereInput | Prisma.InferenceEventScalarWhereInput[]
+}
+
+export type InferenceEventUncheckedUpdateManyWithoutUserNestedInput = {
+  create?: Prisma.XOR<Prisma.InferenceEventCreateWithoutUserInput, Prisma.InferenceEventUncheckedCreateWithoutUserInput> | Prisma.InferenceEventCreateWithoutUserInput[] | Prisma.InferenceEventUncheckedCreateWithoutUserInput[]
+  connectOrCreate?: Prisma.InferenceEventCreateOrConnectWithoutUserInput | Prisma.InferenceEventCreateOrConnectWithoutUserInput[]
+  upsert?: Prisma.InferenceEventUpsertWithWhereUniqueWithoutUserInput | Prisma.InferenceEventUpsertWithWhereUniqueWithoutUserInput[]
+  createMany?: Prisma.InferenceEventCreateManyUserInputEnvelope
+  set?: Prisma.InferenceEventWhereUniqueInput | Prisma.InferenceEventWhereUniqueInput[]
+  disconnect?: Prisma.InferenceEventWhereUniqueInput | Prisma.InferenceEventWhereUniqueInput[]
+  delete?: Prisma.InferenceEventWhereUniqueInput | Prisma.InferenceEventWhereUniqueInput[]
+  connect?: Prisma.InferenceEventWhereUniqueInput | Prisma.InferenceEventWhereUniqueInput[]
+  update?: Prisma.InferenceEventUpdateWithWhereUniqueWithoutUserInput | Prisma.InferenceEventUpdateWithWhereUniqueWithoutUserInput[]
+  updateMany?: Prisma.InferenceEventUpdateManyWithWhereWithoutUserInput | Prisma.InferenceEventUpdateManyWithWhereWithoutUserInput[]
+  deleteMany?: Prisma.InferenceEventScalarWhereInput | Prisma.InferenceEventScalarWhereInput[]
+}
+
 export type InferenceEventCreateWithoutConversationInput = {
   id: string
   sessionId?: string | null
-  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -992,12 +1035,12 @@ export type InferenceEventCreateWithoutConversationInput = {
   persistedAt?: Date | string
   attempts?: number
   extractedMetadata?: Prisma.ExtractedMetadataCreateNestedManyWithoutInferenceEventInput
+  user: Prisma.UserCreateNestedOneWithoutInferenceEventsInput
 }
 
 export type InferenceEventUncheckedCreateWithoutConversationInput = {
   id: string
   sessionId?: string | null
-  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -1022,6 +1065,7 @@ export type InferenceEventUncheckedCreateWithoutConversationInput = {
   processingStartedAt?: Date | string | null
   persistedAt?: Date | string
   attempts?: number
+  userId: string
   extractedMetadata?: Prisma.ExtractedMetadataUncheckedCreateNestedManyWithoutInferenceEventInput
 }
 
@@ -1058,7 +1102,6 @@ export type InferenceEventScalarWhereInput = {
   id?: Prisma.StringFilter<"InferenceEvent"> | string
   conversationId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   sessionId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
-  userId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   traceId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   requestId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   eventType?: Prisma.EnumInferenceEventTypeFilter<"InferenceEvent"> | $Enums.InferenceEventType
@@ -1083,12 +1126,12 @@ export type InferenceEventScalarWhereInput = {
   processingStartedAt?: Prisma.DateTimeNullableFilter<"InferenceEvent"> | Date | string | null
   persistedAt?: Prisma.DateTimeFilter<"InferenceEvent"> | Date | string
   attempts?: Prisma.IntFilter<"InferenceEvent"> | number
+  userId?: Prisma.StringFilter<"InferenceEvent"> | string
 }
 
 export type InferenceEventCreateWithoutExtractedMetadataInput = {
   id: string
   sessionId?: string | null
-  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -1114,13 +1157,13 @@ export type InferenceEventCreateWithoutExtractedMetadataInput = {
   persistedAt?: Date | string
   attempts?: number
   conversation?: Prisma.ConversationCreateNestedOneWithoutInferenceEventsInput
+  user: Prisma.UserCreateNestedOneWithoutInferenceEventsInput
 }
 
 export type InferenceEventUncheckedCreateWithoutExtractedMetadataInput = {
   id: string
   conversationId?: string | null
   sessionId?: string | null
-  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -1145,6 +1188,7 @@ export type InferenceEventUncheckedCreateWithoutExtractedMetadataInput = {
   processingStartedAt?: Date | string | null
   persistedAt?: Date | string
   attempts?: number
+  userId: string
 }
 
 export type InferenceEventCreateOrConnectWithoutExtractedMetadataInput = {
@@ -1166,7 +1210,6 @@ export type InferenceEventUpdateToOneWithWhereWithoutExtractedMetadataInput = {
 export type InferenceEventUpdateWithoutExtractedMetadataInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -1192,13 +1235,13 @@ export type InferenceEventUpdateWithoutExtractedMetadataInput = {
   persistedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   conversation?: Prisma.ConversationUpdateOneWithoutInferenceEventsNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutInferenceEventsNestedInput
 }
 
 export type InferenceEventUncheckedUpdateWithoutExtractedMetadataInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   conversationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -1223,12 +1266,223 @@ export type InferenceEventUncheckedUpdateWithoutExtractedMetadataInput = {
   processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   persistedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+}
+
+export type InferenceEventCreateWithoutUserInput = {
+  id: string
+  sessionId?: string | null
+  traceId?: string | null
+  requestId?: string | null
+  eventType: $Enums.InferenceEventType
+  status: $Enums.InferenceStatus
+  sequence: number
+  provider: string
+  model: string
+  operation?: string | null
+  startedAt: Date | string
+  emittedAt: Date | string
+  completedAt?: Date | string | null
+  latencyMs?: number | null
+  inputTokens?: number | null
+  outputTokens?: number | null
+  totalTokens?: number | null
+  metadata: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  previews: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  rawEvent: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  receivedAt: Date | string
+  queuedAt: Date | string
+  processingStartedAt?: Date | string | null
+  persistedAt?: Date | string
+  attempts?: number
+  extractedMetadata?: Prisma.ExtractedMetadataCreateNestedManyWithoutInferenceEventInput
+  conversation?: Prisma.ConversationCreateNestedOneWithoutInferenceEventsInput
+}
+
+export type InferenceEventUncheckedCreateWithoutUserInput = {
+  id: string
+  conversationId?: string | null
+  sessionId?: string | null
+  traceId?: string | null
+  requestId?: string | null
+  eventType: $Enums.InferenceEventType
+  status: $Enums.InferenceStatus
+  sequence: number
+  provider: string
+  model: string
+  operation?: string | null
+  startedAt: Date | string
+  emittedAt: Date | string
+  completedAt?: Date | string | null
+  latencyMs?: number | null
+  inputTokens?: number | null
+  outputTokens?: number | null
+  totalTokens?: number | null
+  metadata: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  previews: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  rawEvent: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  receivedAt: Date | string
+  queuedAt: Date | string
+  processingStartedAt?: Date | string | null
+  persistedAt?: Date | string
+  attempts?: number
+  extractedMetadata?: Prisma.ExtractedMetadataUncheckedCreateNestedManyWithoutInferenceEventInput
+}
+
+export type InferenceEventCreateOrConnectWithoutUserInput = {
+  where: Prisma.InferenceEventWhereUniqueInput
+  create: Prisma.XOR<Prisma.InferenceEventCreateWithoutUserInput, Prisma.InferenceEventUncheckedCreateWithoutUserInput>
+}
+
+export type InferenceEventCreateManyUserInputEnvelope = {
+  data: Prisma.InferenceEventCreateManyUserInput | Prisma.InferenceEventCreateManyUserInput[]
+  skipDuplicates?: boolean
+}
+
+export type InferenceEventUpsertWithWhereUniqueWithoutUserInput = {
+  where: Prisma.InferenceEventWhereUniqueInput
+  update: Prisma.XOR<Prisma.InferenceEventUpdateWithoutUserInput, Prisma.InferenceEventUncheckedUpdateWithoutUserInput>
+  create: Prisma.XOR<Prisma.InferenceEventCreateWithoutUserInput, Prisma.InferenceEventUncheckedCreateWithoutUserInput>
+}
+
+export type InferenceEventUpdateWithWhereUniqueWithoutUserInput = {
+  where: Prisma.InferenceEventWhereUniqueInput
+  data: Prisma.XOR<Prisma.InferenceEventUpdateWithoutUserInput, Prisma.InferenceEventUncheckedUpdateWithoutUserInput>
+}
+
+export type InferenceEventUpdateManyWithWhereWithoutUserInput = {
+  where: Prisma.InferenceEventScalarWhereInput
+  data: Prisma.XOR<Prisma.InferenceEventUpdateManyMutationInput, Prisma.InferenceEventUncheckedUpdateManyWithoutUserInput>
 }
 
 export type InferenceEventCreateManyConversationInput = {
   id: string
   sessionId?: string | null
-  userId?: string | null
+  traceId?: string | null
+  requestId?: string | null
+  eventType: $Enums.InferenceEventType
+  status: $Enums.InferenceStatus
+  sequence: number
+  provider: string
+  model: string
+  operation?: string | null
+  startedAt: Date | string
+  emittedAt: Date | string
+  completedAt?: Date | string | null
+  latencyMs?: number | null
+  inputTokens?: number | null
+  outputTokens?: number | null
+  totalTokens?: number | null
+  metadata: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  previews: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  rawEvent: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  receivedAt: Date | string
+  queuedAt: Date | string
+  processingStartedAt?: Date | string | null
+  persistedAt?: Date | string
+  attempts?: number
+  userId: string
+}
+
+export type InferenceEventUpdateWithoutConversationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
+  status?: Prisma.EnumInferenceStatusFieldUpdateOperationsInput | $Enums.InferenceStatus
+  sequence?: Prisma.IntFieldUpdateOperationsInput | number
+  provider?: Prisma.StringFieldUpdateOperationsInput | string
+  model?: Prisma.StringFieldUpdateOperationsInput | string
+  operation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  emittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  inputTokens?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  outputTokens?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  totalTokens?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  previews?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  rawEvent?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  queuedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  persistedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attempts?: Prisma.IntFieldUpdateOperationsInput | number
+  extractedMetadata?: Prisma.ExtractedMetadataUpdateManyWithoutInferenceEventNestedInput
+  user?: Prisma.UserUpdateOneRequiredWithoutInferenceEventsNestedInput
+}
+
+export type InferenceEventUncheckedUpdateWithoutConversationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
+  status?: Prisma.EnumInferenceStatusFieldUpdateOperationsInput | $Enums.InferenceStatus
+  sequence?: Prisma.IntFieldUpdateOperationsInput | number
+  provider?: Prisma.StringFieldUpdateOperationsInput | string
+  model?: Prisma.StringFieldUpdateOperationsInput | string
+  operation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  emittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  inputTokens?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  outputTokens?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  totalTokens?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  previews?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  rawEvent?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  queuedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  persistedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attempts?: Prisma.IntFieldUpdateOperationsInput | number
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  extractedMetadata?: Prisma.ExtractedMetadataUncheckedUpdateManyWithoutInferenceEventNestedInput
+}
+
+export type InferenceEventUncheckedUpdateManyWithoutConversationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
+  status?: Prisma.EnumInferenceStatusFieldUpdateOperationsInput | $Enums.InferenceStatus
+  sequence?: Prisma.IntFieldUpdateOperationsInput | number
+  provider?: Prisma.StringFieldUpdateOperationsInput | string
+  model?: Prisma.StringFieldUpdateOperationsInput | string
+  operation?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  emittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  latencyMs?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  inputTokens?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  outputTokens?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  totalTokens?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  previews?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  error?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  rawEvent?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  receivedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  queuedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  processingStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  persistedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attempts?: Prisma.IntFieldUpdateOperationsInput | number
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+}
+
+export type InferenceEventCreateManyUserInput = {
+  id: string
+  conversationId?: string | null
+  sessionId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -1255,10 +1509,9 @@ export type InferenceEventCreateManyConversationInput = {
   attempts?: number
 }
 
-export type InferenceEventUpdateWithoutConversationInput = {
+export type InferenceEventUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -1284,12 +1537,13 @@ export type InferenceEventUpdateWithoutConversationInput = {
   persistedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attempts?: Prisma.IntFieldUpdateOperationsInput | number
   extractedMetadata?: Prisma.ExtractedMetadataUpdateManyWithoutInferenceEventNestedInput
+  conversation?: Prisma.ConversationUpdateOneWithoutInferenceEventsNestedInput
 }
 
-export type InferenceEventUncheckedUpdateWithoutConversationInput = {
+export type InferenceEventUncheckedUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  conversationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -1317,10 +1571,10 @@ export type InferenceEventUncheckedUpdateWithoutConversationInput = {
   extractedMetadata?: Prisma.ExtractedMetadataUncheckedUpdateManyWithoutInferenceEventNestedInput
 }
 
-export type InferenceEventUncheckedUpdateManyWithoutConversationInput = {
+export type InferenceEventUncheckedUpdateManyWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  conversationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -1382,7 +1636,6 @@ export type InferenceEventSelect<ExtArgs extends runtime.Types.Extensions.Intern
   id?: boolean
   conversationId?: boolean
   sessionId?: boolean
-  userId?: boolean
   traceId?: boolean
   requestId?: boolean
   eventType?: boolean
@@ -1407,8 +1660,10 @@ export type InferenceEventSelect<ExtArgs extends runtime.Types.Extensions.Intern
   processingStartedAt?: boolean
   persistedAt?: boolean
   attempts?: boolean
-  conversation?: boolean | Prisma.InferenceEvent$conversationArgs<ExtArgs>
+  userId?: boolean
   extractedMetadata?: boolean | Prisma.InferenceEvent$extractedMetadataArgs<ExtArgs>
+  conversation?: boolean | Prisma.InferenceEvent$conversationArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   _count?: boolean | Prisma.InferenceEventCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["inferenceEvent"]>
 
@@ -1416,7 +1671,6 @@ export type InferenceEventSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   id?: boolean
   conversationId?: boolean
   sessionId?: boolean
-  userId?: boolean
   traceId?: boolean
   requestId?: boolean
   eventType?: boolean
@@ -1441,14 +1695,15 @@ export type InferenceEventSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   processingStartedAt?: boolean
   persistedAt?: boolean
   attempts?: boolean
+  userId?: boolean
   conversation?: boolean | Prisma.InferenceEvent$conversationArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["inferenceEvent"]>
 
 export type InferenceEventSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   conversationId?: boolean
   sessionId?: boolean
-  userId?: boolean
   traceId?: boolean
   requestId?: boolean
   eventType?: boolean
@@ -1473,14 +1728,15 @@ export type InferenceEventSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   processingStartedAt?: boolean
   persistedAt?: boolean
   attempts?: boolean
+  userId?: boolean
   conversation?: boolean | Prisma.InferenceEvent$conversationArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["inferenceEvent"]>
 
 export type InferenceEventSelectScalar = {
   id?: boolean
   conversationId?: boolean
   sessionId?: boolean
-  userId?: boolean
   traceId?: boolean
   requestId?: boolean
   eventType?: boolean
@@ -1505,32 +1761,36 @@ export type InferenceEventSelectScalar = {
   processingStartedAt?: boolean
   persistedAt?: boolean
   attempts?: boolean
+  userId?: boolean
 }
 
-export type InferenceEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "conversationId" | "sessionId" | "userId" | "traceId" | "requestId" | "eventType" | "status" | "sequence" | "provider" | "model" | "operation" | "startedAt" | "emittedAt" | "completedAt" | "latencyMs" | "inputTokens" | "outputTokens" | "totalTokens" | "metadata" | "previews" | "error" | "rawEvent" | "receivedAt" | "queuedAt" | "processingStartedAt" | "persistedAt" | "attempts", ExtArgs["result"]["inferenceEvent"]>
+export type InferenceEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "conversationId" | "sessionId" | "traceId" | "requestId" | "eventType" | "status" | "sequence" | "provider" | "model" | "operation" | "startedAt" | "emittedAt" | "completedAt" | "latencyMs" | "inputTokens" | "outputTokens" | "totalTokens" | "metadata" | "previews" | "error" | "rawEvent" | "receivedAt" | "queuedAt" | "processingStartedAt" | "persistedAt" | "attempts" | "userId", ExtArgs["result"]["inferenceEvent"]>
 export type InferenceEventInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  conversation?: boolean | Prisma.InferenceEvent$conversationArgs<ExtArgs>
   extractedMetadata?: boolean | Prisma.InferenceEvent$extractedMetadataArgs<ExtArgs>
+  conversation?: boolean | Prisma.InferenceEvent$conversationArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   _count?: boolean | Prisma.InferenceEventCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type InferenceEventIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   conversation?: boolean | Prisma.InferenceEvent$conversationArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
 export type InferenceEventIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   conversation?: boolean | Prisma.InferenceEvent$conversationArgs<ExtArgs>
+  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
 
 export type $InferenceEventPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "InferenceEvent"
   objects: {
-    conversation: Prisma.$ConversationPayload<ExtArgs> | null
     extractedMetadata: Prisma.$ExtractedMetadataPayload<ExtArgs>[]
+    conversation: Prisma.$ConversationPayload<ExtArgs> | null
+    user: Prisma.$UserPayload<ExtArgs>
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     conversationId: string | null
     sessionId: string | null
-    userId: string | null
     traceId: string | null
     requestId: string | null
     eventType: $Enums.InferenceEventType
@@ -1555,6 +1815,7 @@ export type $InferenceEventPayload<ExtArgs extends runtime.Types.Extensions.Inte
     processingStartedAt: Date | null
     persistedAt: Date
     attempts: number
+    userId: string
   }, ExtArgs["result"]["inferenceEvent"]>
   composites: {}
 }
@@ -1949,8 +2210,9 @@ readonly fields: InferenceEventFieldRefs;
  */
 export interface Prisma__InferenceEventClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  conversation<T extends Prisma.InferenceEvent$conversationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.InferenceEvent$conversationArgs<ExtArgs>>): Prisma.Prisma__ConversationClient<runtime.Types.Result.GetResult<Prisma.$ConversationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   extractedMetadata<T extends Prisma.InferenceEvent$extractedMetadataArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.InferenceEvent$extractedMetadataArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ExtractedMetadataPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  conversation<T extends Prisma.InferenceEvent$conversationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.InferenceEvent$conversationArgs<ExtArgs>>): Prisma.Prisma__ConversationClient<runtime.Types.Result.GetResult<Prisma.$ConversationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1983,7 +2245,6 @@ export interface InferenceEventFieldRefs {
   readonly id: Prisma.FieldRef<"InferenceEvent", 'String'>
   readonly conversationId: Prisma.FieldRef<"InferenceEvent", 'String'>
   readonly sessionId: Prisma.FieldRef<"InferenceEvent", 'String'>
-  readonly userId: Prisma.FieldRef<"InferenceEvent", 'String'>
   readonly traceId: Prisma.FieldRef<"InferenceEvent", 'String'>
   readonly requestId: Prisma.FieldRef<"InferenceEvent", 'String'>
   readonly eventType: Prisma.FieldRef<"InferenceEvent", 'InferenceEventType'>
@@ -2008,6 +2269,7 @@ export interface InferenceEventFieldRefs {
   readonly processingStartedAt: Prisma.FieldRef<"InferenceEvent", 'DateTime'>
   readonly persistedAt: Prisma.FieldRef<"InferenceEvent", 'DateTime'>
   readonly attempts: Prisma.FieldRef<"InferenceEvent", 'Int'>
+  readonly userId: Prisma.FieldRef<"InferenceEvent", 'String'>
 }
     
 
@@ -2409,25 +2671,6 @@ export type InferenceEventDeleteManyArgs<ExtArgs extends runtime.Types.Extension
 }
 
 /**
- * InferenceEvent.conversation
- */
-export type InferenceEvent$conversationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the Conversation
-   */
-  select?: Prisma.ConversationSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the Conversation
-   */
-  omit?: Prisma.ConversationOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.ConversationInclude<ExtArgs> | null
-  where?: Prisma.ConversationWhereInput
-}
-
-/**
  * InferenceEvent.extractedMetadata
  */
 export type InferenceEvent$extractedMetadataArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2449,6 +2692,25 @@ export type InferenceEvent$extractedMetadataArgs<ExtArgs extends runtime.Types.E
   take?: number
   skip?: number
   distinct?: Prisma.ExtractedMetadataScalarFieldEnum | Prisma.ExtractedMetadataScalarFieldEnum[]
+}
+
+/**
+ * InferenceEvent.conversation
+ */
+export type InferenceEvent$conversationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Conversation
+   */
+  select?: Prisma.ConversationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Conversation
+   */
+  omit?: Prisma.ConversationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ConversationInclude<ExtArgs> | null
+  where?: Prisma.ConversationWhereInput
 }
 
 /**
