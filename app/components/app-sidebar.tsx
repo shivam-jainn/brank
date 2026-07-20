@@ -1,22 +1,22 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ChevronDownIcon,
+  EyeDashed,
   LayoutDashboardIcon,
   LogOutIcon,
   PanelLeftIcon,
   Settings2Icon,
   SquarePenIcon,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeftIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { hardSignOut } from "@/lib/auth-client";
+import { hardSignOut, useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -27,21 +27,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { BrankLogo } from "@/components/ui/brank-logo";
-
-const CONVERSATIONS_QUERY_KEY = ["conversations", "recent"] as const;
-
-type SavedConversation = {
-  id: string;
-  title: string | null;
-};
-
-async function fetchConversations(): Promise<SavedConversation[]> {
-  const res = await fetch("/api/conversations");
-  if (!res.ok) {
-    throw new Error(`Failed to load conversations: ${res.status}`);
-  }
-  return res.json();
-}
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
+import { useRecentConversations, CONVERSATIONS_QUERY_KEY } from "@/hooks/use-recent-conversations";
+import type { SavedConversation } from "@/hooks/use-recent-conversations";
 
 export function AppSidebar({
   sidebarOpen,
@@ -72,12 +64,18 @@ export function AppSidebar({
 
   const activeConversationId = currentConversationId ?? localConversationId;
 
-  const { data: savedConversations = [] } = useQuery({
-    queryKey: CONVERSATIONS_QUERY_KEY,
-    queryFn: fetchConversations,
-    gcTime: 1000 * 60 * 30,
-    staleTime: 1000 * 60 * 5,
-  });
+  const { data: session } = useSession();
+  const user = session?.user;
+  const displayName = user?.name || user?.email || "Guest";
+  const displayEmail = user?.email ?? "Not signed in";
+  const initials =
+    (user?.name ?? user?.email ?? "G")
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "G";
+
+  const { data: savedConversations = [] } = useRecentConversations();
 
   const handleNewConversation = useCallback(() => {
     const next = crypto.randomUUID();
@@ -136,7 +134,7 @@ export function AppSidebar({
   return (
     <aside
       className={cn(
-        "hidden w-[260px] shrink-0 flex-col bg-[#171717] p-2",
+        "hidden h-full w-[260px] shrink-0 flex-col bg-[#171717] p-2",
         sidebarOpen && "md:flex"
       )}
     >
@@ -187,42 +185,44 @@ export function AppSidebar({
           className="mt-1 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors hover:bg-white/10 text-[#ececec]"
           href="/dashboard"
         >
-          <LayoutDashboardIcon className="size-4" />
-          <span>Dashboard</span>
+          <EyeDashed className="size-4" />
+          <span>Observe</span>
         </Link>
       )}
 
-      <AnimatePresence initial={false}>
-        {!isDashboard && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="mt-5 min-h-0 flex-1 overflow-y-auto px-1 flex flex-col"
-          >
-            {savedConversations.length > 0 && (
-              <p className="px-2 pb-2 text-xs font-medium text-[#8b8b8b]">Recent</p>
-            )}
-            <div className="space-y-0.5">
-              {savedConversations.map((conversation) => (
-                <button
-                  className={cn(
-                    "block w-full truncate rounded-lg px-2 py-2 text-left text-sm text-[#ececec] transition-colors hover:bg-white/10",
-                    conversation.id === activeConversationId && "bg-white/10"
-                  )}
-                  key={conversation.id}
-                  onClick={() => handleResumeConversation(conversation)}
-                  title={conversation.title ?? conversation.id}
-                  type="button"
-                >
-                  {conversation.title ?? "Untitled conversation"}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-1 flex flex-col">
+        <AnimatePresence initial={false}>
+          {!isDashboard && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="flex flex-col"
+            >
+              {savedConversations.length > 0 && (
+                <p className="px-2 pb-2 text-xs font-medium text-[#8b8b8b]">Recent</p>
+              )}
+              <div className="space-y-0.5">
+                {savedConversations.map((conversation) => (
+                  <button
+                    className={cn(
+                      "block w-full truncate rounded-lg px-2 py-2 text-left text-sm text-[#ececec] transition-colors hover:bg-white/10",
+                      conversation.id === activeConversationId && "bg-white/10"
+                    )}
+                    key={conversation.id}
+                    onClick={() => handleResumeConversation(conversation)}
+                    title={conversation.title ?? conversation.id}
+                    type="button"
+                  >
+                    {conversation.title ?? "Untitled conversation"}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
       <div className="mt-auto w-full">
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -231,13 +231,19 @@ export function AppSidebar({
                 className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-white/10 data-[popup-open]:bg-white/10"
                 type="button"
               >
-                <span className="relative flex size-8 items-center justify-center rounded-full bg-[#252525] ring-1 ring-white/10">
-                  <Image alt="" height={18} src="/olive-mark.svg" width={18} />
-                  <span className="absolute right-0 bottom-0 size-2 rounded-full border-2 border-[#171717] bg-[#74a742]" />
-                </span>
+                <Avatar data-size="default" className="size-8 ring-1 ring-white/10">
+                  {user?.image ? (
+                    <AvatarImage alt={displayName} src={user.image} />
+                  ) : null}
+                  <AvatarFallback className="bg-[#252525] text-[#ececec]">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
                 <span className="min-w-0 flex-1 text-[#ececec]">
-                  <span className="block font-medium">Olive AI</span>
-                  <span className="block text-xs text-[#8b8b8b]">Local inference</span>
+                  <span className="block truncate font-medium">{displayName}</span>
+                  <span className="block truncate text-xs text-[#8b8b8b]">
+                    {displayEmail}
+                  </span>
                 </span>
                 <ChevronDownIcon className="size-4 text-[#8b8b8b]" />
               </button>

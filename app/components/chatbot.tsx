@@ -74,7 +74,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { readUIMessageStream, parseJsonEventStream, uiMessageChunkSchema, type ToolUIPart } from "ai";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDownIcon,
@@ -97,12 +97,13 @@ import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { hardSignOut } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
+import { getStableBrowserId } from "@/lib/browser-id";
 import { SettingsDialog, readProviderKeys } from "./settings-dialog";
 import { AppSidebar } from "./app-sidebar";
 import { motion } from "motion/react";
 import { BrankLogo } from "@/components/ui/brank-logo";
-
-const CONVERSATIONS_QUERY_KEY = ["conversations", "recent"] as const;
+import { useRecentConversations, CONVERSATIONS_QUERY_KEY } from "@/hooks/use-recent-conversations";
+import type { SavedConversation, SavedChatMessage } from "@/hooks/use-recent-conversations";
 
 const SUGGESTIONS = [
   "What are the latest trends in AI?",
@@ -136,18 +137,6 @@ interface MessageType {
   }[];
 }
 
-type SavedConversation = {
-  id: string;
-  title: string | null;
-  messages: SavedChatMessage[];
-};
-
-type SavedChatMessage = {
-  id: string;
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-};
-
 type SourceUrlPart = {
   url?: string;
   title?: string;
@@ -162,14 +151,6 @@ type ToolLikePart = {
   output?: unknown;
   errorText?: string;
 };
-
-async function fetchConversations(): Promise<SavedConversation[]> {
-  const res = await fetch("/api/conversations");
-  if (!res.ok) {
-    throw new Error(`Failed to load conversations: ${res.status}`);
-  }
-  return res.json();
-}
 
 function savedMessageToMessageType(message: SavedChatMessage): MessageType | null {
   if (message.role !== "user" && message.role !== "assistant") {
@@ -515,6 +496,7 @@ export function Chatbot() {
   >("ready");
   const [conversationId, setConversationId] = useState<string>(() =>
     typeof window === "undefined" ? "" : getStableBrowserId("brank-conversation-id")
+
   );
   const abortControllerRef = useRef<AbortController | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -538,12 +520,7 @@ export function Chatbot() {
 
   const {
     data: savedConversations = [],
-  } = useQuery({
-    queryKey: CONVERSATIONS_QUERY_KEY,
-    queryFn: fetchConversations,
-    gcTime: 1000 * 60 * 30,
-    staleTime: 1000 * 60 * 5,
-  });
+  } = useRecentConversations();
 
   const currentSavedConversation = useMemo(
     () => savedConversations.find((conversation) => conversation.id === conversationId),
@@ -1291,11 +1268,3 @@ export function Chatbot() {
   );
 }
 
-function getStableBrowserId(key: string): string {
-  const existing = window.localStorage.getItem(key);
-  if (existing) return existing;
-
-  const next = crypto.randomUUID();
-  window.localStorage.setItem(key, next);
-  return next;
-}

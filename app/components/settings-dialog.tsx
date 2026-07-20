@@ -130,9 +130,6 @@ export function SettingsDialog({
               <KeyRoundIcon className="size-4" />
               BYOK
             </button>
-            <div className="mt-auto px-3 py-2 text-xs leading-5 text-[#8d8d8d]">
-              Keys stay in this browser and are sent only to your Brank server for provider requests.
-            </div>
           </aside>
 
           <section className="flex min-h-0 min-w-0 flex-col">
@@ -249,7 +246,7 @@ export function SettingsDialog({
                             {showKey ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
                           </Button>
                         </div>
-                        <p className="text-xs leading-5 text-[#8f8f8f]">Expected server variable: {activeProvider.apiKeyEnv}</p>
+                        <p className="text-xs leading-5 text-[#8f8f8f]">Key is stored locally in this browser and sent per-request to the server.</p>
                       </div>
                       <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-[#181818] p-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex min-w-0 items-start gap-3">
