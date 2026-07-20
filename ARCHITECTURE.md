@@ -162,3 +162,16 @@ and resources.
 
 All three paths scale the same components: stateless app, fan-out worker, and the brokers.
 
+---
+
+## Future Improvements
+
+If given more time, the following improvements would be implemented to enhance scalability, reliability, and developer experience:
+
+1. **ClickHouse Swap-in:** Swap PostgreSQL with ClickHouse (or another columnar database) for high-throughput, low-cost analytical queries on millions of inference events.
+2. **Deep Auto-Instrumentation:** Support auto-patching of popular libraries (like OpenAI, Anthropic, and LangChain) using Node/Bun loader hooks or wrapping import symbols.
+3. **Advanced PII Masking:** Integrate entity detection frameworks (like Microsoft Presidio) to dynamically detect and mask contextual PII (names, addresses) beyond regex-based redaction.
+4. **DLQ Replay Mechanism:** Implement a dashboard feature to inspect, modify, and replay poison messages directly from the Dead-Letter Queue (DLQ).
+5. **Real-time Alerting:** Add webhook triggers in the worker to instantly notify Slack/PagerDuty when error rates or latencies cross custom thresholds.
+
+

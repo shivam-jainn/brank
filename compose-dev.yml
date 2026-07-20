@@ -36,6 +36,7 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: brank
       RABBITMQ_DEFAULT_PASS: brank
+      RABBITMQ_ERLANG_COOKIE: "branksecretcookie123456789"
     ports:
       - "5672:5672"
       - "15672:15672"   # management UI → http://localhost:15672
@@ -50,8 +51,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: app
+      dockerfile: Dockerfile.app
     profiles: ["app"]
     env_file:
       - path: .env
@@ -76,8 +76,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: worker
+      dockerfile: Dockerfile.worker
     profiles: ["workers"]
     env_file:
       - path: .env

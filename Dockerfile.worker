@@ -1,0 +1,15 @@
+FROM oven/bun:1.2-alpine
+WORKDIR /app
+RUN apk add --no-cache openssl
+
+COPY package.json bun.lock ./
+COPY prisma ./prisma
+COPY packages/db/package.json packages/db/package.json
+COPY packages/inferhence/package.json packages/inferhence/package.json
+COPY packages/ingestion/package.json packages/ingestion/package.json
+COPY packages/providers/package.json packages/providers/package.json
+
+RUN bun install --frozen-lockfile
+
+COPY . .
+CMD ["bun", "packages/ingestion/src/worker.ts"]

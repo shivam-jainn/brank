@@ -192,8 +192,8 @@ _k8s-cluster-delete:
 
 _k8s-build:
 	@echo "==> Building images"
-	docker build -t brank:$(K8S_BUILD_TAG) --target app .
-	docker build -t brank-worker:$(K8S_BUILD_TAG) --target worker .
+	docker build -t brank:$(K8S_BUILD_TAG) -f Dockerfile.app .
+	docker build -t brank-worker:$(K8S_BUILD_TAG) -f Dockerfile.worker .
 
 _k8s-load: _k8s-build
 	@if command -v kind >/dev/null && kind get clusters 2>/dev/null | grep -qx "$(K8S_CLUSTER_NAME)"; then \
