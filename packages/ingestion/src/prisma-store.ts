@@ -9,6 +9,7 @@ export function createPrismaEventStore(prisma: PrismaClient) {
           id: event.eventId,
           conversationId: event.ids.conversationId,
           sessionId: event.ids.sessionId,
+          userId: event.ids.userId,
           traceId: event.ids.traceId,
           requestId: event.ids.requestId,
           eventType: event.eventType,

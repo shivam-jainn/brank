@@ -293,10 +293,12 @@ export function startMicroBatchConsumer(
     batch = [];
     state.setPendingBatchSize(0);
     const processingStartedAt = new Date().toISOString();
-    const events = messages.map((message) => ({
-      ...message.event,
-      processingStartedAt,
-    }));
+    const events = messages
+      .filter((message) => message.event.eventType !== "progress")
+      .map((message) => ({
+        ...message.event,
+        processingStartedAt,
+      }));
     const started = Date.now();
 
     try {

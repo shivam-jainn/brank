@@ -44,7 +44,9 @@ export function createIngestionService(options: IngestionServiceOptions = {}): I
       try {
         const event = prepareEventForIngestion(payload);
         await queue.publish(event);
-        state.markAccepted(event);
+        if (event.eventType !== "progress") {
+          state.markAccepted(event);
+        }
 
         return Response.json(
           {
