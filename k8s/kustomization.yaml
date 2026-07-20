@@ -21,12 +21,12 @@ namespace: brank
 secretGenerator:
   - name: brank-secrets
     envs:
-      - ../.env
+      - .env
 
 configMapGenerator:
   - name: brank-config
     envs:
-      - ../.env
+      - .env
 
 resources:
   - postgres.yaml

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { DitherOrb } from "@/components/marketing/dither-orb";
 import { OAuthPanel } from "@/components/marketing/oauth-panel";
 
+export const dynamic = "force-dynamic";
+
 export default function SignInPage() {
   return (
     <main className="relative grid min-h-dvh bg-[#f3f1ea] text-[#111111] lg:grid-cols-[1fr_0.86fr]">

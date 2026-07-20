@@ -31,6 +31,14 @@ mock.module("motion/react", () => ({
 // Mock Better Auth Client
 mock.module("@/lib/auth-client", () => ({
   signOut: async () => ({ error: null }),
+  hardSignOut: async () => {},
+  useSession: () => ({ data: { user: { name: "Guest", email: "guest@example.com" } } }),
+}));
+
+// Mock recent conversations hook
+mock.module("@/hooks/use-recent-conversations", () => ({
+  useRecentConversations: () => ({ data: (globalThis as any).queryData || [] }),
+  CONVERSATIONS_QUERY_KEY: "conversations",
 }));
 
 // Mock React hooks to allow direct function call

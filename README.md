@@ -23,8 +23,6 @@ It is two cooperating parts:
 
 ## Screenshots
 
-> Placeholder images — drop real screenshots into `public/screenshots/`.
-
 | Homepage | Auth | Dashboard | Chat |
 |----------|------|-----------|------|
 | ![Homepage](public/screenshots/homepage.png) | ![Auth](public/screenshots/auth.png) | ![Dashboard](public/screenshots/dashboard.png) | ![Chat](public/screenshots/chat.png) |

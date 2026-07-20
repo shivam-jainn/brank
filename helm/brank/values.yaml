@@ -106,14 +106,16 @@ ingestion:
 existingSecret: ""
 secrets:
   # These three are required for the app/worker to function.
-  DATABASE_URL: ""
-  RABBITMQ_URL: ""
-  REDIS_URL: ""
+  DATABASE_URL: "postgresql://brank:brank@brank-postgres:5432/brank"
+  RABBITMQ_URL: "amqp://brank:brank@brank-rabbitmq:5672"
+  REDIS_URL: "redis://brank-redis:6379"
   # At least one provider key is required for chat to work.
   OPENAI_API_KEY: ""
   GROQ_API_KEY: ""
   # Optional auth / provider keys.
   BETTER_AUTH_SECRET: ""
+  BETTER_AUTH_URL: "http://brank.local"
+  NEXT_PUBLIC_APP_URL: "http://brank.local"
   ANTHROPIC_API_KEY: ""
   GOOGLE_API_KEY: ""
   GEMINI_API_KEY: ""

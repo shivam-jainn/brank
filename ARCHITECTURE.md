@@ -5,21 +5,8 @@ streams chat responses; a standalone **worker** consumes those events and writes
 append-only telemetry to Postgres. This decouples chat latency from telemetry writes: a slow
 or paused database write never delays a token reaching the user.
 
-```
-Browser ──► Next.js app (producer)
-              │  /api/chat    (streams via @brank/inferhence)
-              │  /api/ingest  (receives SDK events → validate → redact → enqueue)
-              │  /api/metrics (SSE dashboard feed)
-              ▼  publish
-         Queue  (RabbitMQ in prod; in-memory in dev)
-              ▲  consume (micro-batch)
-              │
-         Worker (Bun) ──► Postgres (Prisma, system of record)
-              │
-         Redis  ── opt-in chat history cache (TTL, invalidated on write)
-```
 
-<!-- Diagram placeholder: architecture-overview.svg -->
+![Architecture Diagram](public/architecture.png)
 
 ---
 
@@ -142,19 +129,16 @@ backs the current `InMemoryMetricsBackend` (rolling buckets) and a future ClickH
 The dashboard reads aggregates over SSE rather than querying Postgres per frame. Delivery is
 best-effort: a dropped metric never blocks a chat response.
 
-<!-- Diagram placeholder: metrics-dashboard.png -->
-
 ---
 
 ## Scaling & Failure
 
 - **App** replicas are stateless and scale horizontally; the queue absorbs write spikes.
-- **Worker** replicas fan out consumption; more workers = faster drain.
+- **Worker** replicas fan out consumption, more workers = faster drain.
 - **At-least-once** ingestion, deduped at write via `skipDuplicates` on `id`.
 - **DLQ** isolates poison messages.
 - Worker pod uses `terminationGracePeriodSeconds: 60` for a clean drain.
-- **Chat UX is never blocked by telemetry** — dropped events are acceptable, dropped
-  responses are not.
+- **Chat UX is never blocked by telemetry** — dropped events are acceptable, dropped responses are not.
 
 ---
 
@@ -178,4 +162,3 @@ and resources.
 
 All three paths scale the same components: stateless app, fan-out worker, and the brokers.
 
-<!-- Diagram placeholder: deploy-topology.svg -->
