@@ -4,12 +4,14 @@ import {
   ActivityIcon,
   AlertTriangleIcon,
   Check,
+  ChevronDown,
+  ChevronUp,
   CircleIcon,
   Copy,
   GaugeIcon,
-  LogsIcon,
   MessageSquareIcon,
   PanelLeftIcon,
+  ShieldAlertIcon,
   SquareIcon,
   Terminal,
   X
@@ -146,8 +148,56 @@ type MetricsResponse = {
   byProvider: ProviderMetric[];
   recent: RecentEvent[];
   recentRuns: RecentRun[];
+  chatSpans: ChatSpanData[];
   availableProviders?: string[];
   availableModels?: string[];
+  pii: {
+    totalRedactions: number;
+    redactedRuns: number;
+    redactionRate: number;
+  };
+};
+
+type ChatSpanData = {
+  conversationId: string;
+  startedAt: string;
+  lastEventAt: string;
+  requests: Array<{
+    id: string;
+    provider: string;
+    model: string;
+    conversationId: string | null;
+    status: string;
+    startedAt: string;
+    lastEventAt: string;
+    latencyMs: number | null;
+    inputTokens: number | null;
+    outputTokens: number | null;
+    totalTokens: number | null;
+    usageEstimated: boolean;
+    previews?: any;
+    eventCount: number;
+    error?: unknown;
+    events: Array<{
+      id: string;
+      provider: string;
+      model: string;
+      status: string;
+      eventType: string;
+      latencyMs: number | null;
+      emittedAt: string;
+      previews?: any;
+      error: unknown;
+      rawEvent?: any;
+    }>;
+  }>;
+  chatMessages: Array<{
+    id: string;
+    role: string;
+    content: string;
+    sequence: number;
+    createdAt: string;
+  }>;
 };
 
 export function Dashboard() {
@@ -159,6 +209,7 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeDetail, setActiveDetail] = useState<{ type: "run" | "event" | "grouped-request"; data: any } | null>(null);
+  const [expandedChatSpans, setExpandedChatSpans] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const params = new URLSearchParams({
@@ -241,7 +292,7 @@ export function Dashboard() {
           </div>
         </header>
 
-        <div className="h-full min-h-0 overflow-y-auto text-[#ececec]">
+        <div className="h-full min-h-0 overflow-y-auto overflow-x-hidden text-[#ececec]">
           <section className="min-h-0">
             <div className="mx-auto grid w-full max-w-[1440px] gap-4 px-4 py-2 md:px-6 lg:px-8">
 
@@ -267,12 +318,13 @@ export function Dashboard() {
                 </div>
               )}
 
-              <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <Stat label="LLM calls" value={(metrics?.totals.totalRuns ?? 0).toLocaleString()} detail={`total over last ${rangeLabel}`} icon={<ActivityIcon className="size-4" />} />
+              <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+                <Stat label="LLM calls" value={(metrics?.totals.totalRuns ?? 0).toLocaleString()} detail={`model invocations · last ${rangeLabel}`} icon={<ActivityIcon className="size-4" />} />
                 <Stat label="Chat messages" value={(metrics?.totals.totalMessages ?? 0).toLocaleString()} detail={`total over last ${rangeLabel}`} icon={<MessageSquareIcon className="size-4" />} />
                 <Stat label="Latency" value={formatMs(metrics?.totals.avgLatencyMs)} detail={`p95 ${formatMs(metrics?.totals.p95LatencyMs)} on completed calls`} icon={<GaugeIcon className="size-4" />} />
                 <Stat label="Cancelled streams" value={(metrics?.totals.cancelledRuns ?? 0).toLocaleString()} detail={`${formatPercent(metrics?.totals.cancellationRate)} cancellation rate`} icon={<SquareIcon className="size-4" />} intent="warn" />
                 <Stat label="Failed calls" value={(metrics?.totals.failedRuns ?? 0).toLocaleString()} detail={`${formatPercent(metrics?.totals.errorRate)} error rate`} icon={<AlertTriangleIcon className="size-4" />} intent="bad" />
+                <Stat label="PII redacted" value={(metrics?.pii.totalRedactions ?? 0).toLocaleString()} detail={`${(metrics?.pii.redactedRuns ?? 0).toLocaleString()} runs · ${formatPercent(metrics?.pii.redactionRate)} redaction rate`} icon={<ShieldAlertIcon className="size-4" />} intent="warn" />
               </section>
 
 
@@ -299,6 +351,7 @@ export function Dashboard() {
                   <Panel kicker="ingestion" title="Pipeline">
                     <div className="grid grid-cols-2 gap-2">
                       <MiniMetric label="Telemetry events" value={metrics?.pipeline.persistedEvents ?? 0} />
+                      <MiniMetric label="Derived calls" value={metrics?.totals.totalRuns ?? 0} />
                       <MiniMetric label="Derived runs" value={metrics?.totals.totalRuns ?? 0} />
                       <MiniMetric label="Chat messages" value={metrics?.totals.totalMessages ?? 0} />
                       <MiniMetric label="Conversations" value={metrics?.totals.totalConversations ?? 0} />
@@ -329,22 +382,22 @@ export function Dashboard() {
                 </Panel>
               </section>
 
-              <section className="mt-8 border-t border-white/10 pt-8">
+              <section className="mt-8 border-t border-white/10 pt-8 min-w-0">
                 <div className="flex items-center justify-between gap-4 mb-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-[#ececec]">Live Ingestion Console</h3>
-                    <p className="text-xs text-[#8b8b8b] mt-1">Real-time telemetry written to pipeline</p>
+                    <h3 className="text-lg font-semibold text-[#ececec]">Chat Spans</h3>
+                    <p className="text-xs text-[#8b8b8b] mt-1">Full conversation history grouped by chat</p>
                   </div>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#171717] px-2.5 py-1 text-xs text-[#8b8b8b] shadow-sm">
                     <Terminal className="size-3.5" />
-                    <span>{metrics?.recent.length ?? 0} events</span>
+                    <span>{metrics?.chatSpans?.length ?? 0} chats</span>
                   </span>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto pr-2 space-y-2">
-                  <LogList
-                    events={metrics?.recent ?? []}
-                    onSelectEvent={(event) => setActiveDetail({ type: "event", data: event })}
-                    onSelectRequest={(request) => setActiveDetail({ type: "grouped-request", data: request })}
+                <div className="max-h-[600px] overflow-y-auto overflow-x-hidden pr-2 space-y-4 w-full min-w-0">
+                  <ChatSpanList
+                    chatSpans={metrics?.chatSpans ?? []}
+                    expandedSpans={expandedChatSpans}
+                    onToggleSpan={(id) => setExpandedChatSpans(prev => ({ ...prev, [id]: !prev[id] }))}
                   />
                 </div>
               </section>
@@ -711,176 +764,334 @@ function ErrorList({ events, onSelectEvent }: { events: RecentEvent[]; onSelectE
   );
 }
 
-type GroupedRequest = {
-  requestId: string;
-  provider: string;
-  model: string;
-  status: string;
-  latencyMs: number | null;
-  emittedAt: string;
-  startedAt: string | null;
-  completedAt: string | null;
-  error: any;
-  events: RecentEvent[];
-};
-
-function LogList({
-  events,
-  onSelectEvent,
-  onSelectRequest,
+function ChatSpanList({
+  chatSpans,
+  expandedSpans,
+  onToggleSpan,
 }: {
-  events: RecentEvent[];
-  onSelectEvent: (event: RecentEvent) => void;
-  onSelectRequest: (request: GroupedRequest) => void;
+  chatSpans: ChatSpanData[];
+  expandedSpans: Record<string, boolean>;
+  onToggleSpan: (id: string) => void;
 }) {
-  const groupedRequests = useMemo(() => {
-    const groups: Record<string, GroupedRequest> = {};
+  const [expandedPairs, setExpandedPairs] = useState<Record<string, boolean>>({});
 
-    // Sort events ascending so timeline flows chronologically
-    const sortedEvents = [...events].sort(
-      (a, b) => new Date(a.emittedAt).getTime() - new Date(b.emittedAt).getTime()
-    );
-
-    for (const event of sortedEvents) {
-      const reqId = event.requestId || event.traceId || event.id;
-      if (!groups[reqId]) {
-        groups[reqId] = {
-          requestId: reqId,
-          provider: event.provider,
-          model: event.model,
-          status: event.status,
-          latencyMs: event.latencyMs,
-          emittedAt: event.emittedAt,
-          startedAt: event.eventType === "started" ? event.emittedAt : null,
-          completedAt: (event.status === "completed" || event.status === "failed" || event.status === "cancelled") ? event.emittedAt : null,
-          error: event.error,
-          events: [],
-        };
-      }
-
-      groups[reqId].events.push(event);
-      groups[reqId].status = event.status;
-      if (event.latencyMs !== null) {
-        groups[reqId].latencyMs = event.latencyMs;
-      }
-      if (event.error) {
-        groups[reqId].error = event.error;
-      }
-      if (event.eventType === "started") {
-        groups[reqId].startedAt = event.emittedAt;
-      }
-      if (event.status === "completed" || event.status === "failed" || event.status === "cancelled") {
-        groups[reqId].completedAt = event.emittedAt;
-      }
-      groups[reqId].emittedAt = event.emittedAt;
-    }
-
-    return Object.values(groups).sort(
-      (a, b) => new Date(b.emittedAt).getTime() - new Date(a.emittedAt).getTime()
-    );
-  }, [events]);
-
-  if (!groupedRequests.length) {
-    return <EmptyState text="No telemetry logs have been recorded in the last hour." />;
+  if (!chatSpans.length) {
+    return <EmptyState text="No chat activity recorded in the last hour." />;
   }
 
+  const togglePair = (key: string) => setExpandedPairs(prev => ({ ...prev, [key]: !prev[key] }));
+
   return (
-    <div className="space-y-3">
-      {groupedRequests.map((request) => {
-        const durationMs = request.latencyMs ?? (request.startedAt && request.completedAt
-          ? new Date(request.completedAt).getTime() - new Date(request.startedAt).getTime()
-          : null);
+    <div className="space-y-4 w-full min-w-0">
+      {chatSpans.map((span) => {
+        const isExpanded = expandedSpans[span.conversationId] ?? false;
+        const userMsgs = span.chatMessages.filter(m => m.role === "user");
+        const assistantMsgs = span.chatMessages.filter(m => m.role === "assistant");
+        const pairCount = Math.max(userMsgs.length, span.requests.length);
+        const lastUserMsg = userMsgs[userMsgs.length - 1];
+
+        // Compute total metrics for the chat
+        const totalTokens = span.requests.reduce((acc, req) => acc + (req.totalTokens || 0), 0);
+        const totalLatency = span.requests.reduce((acc, req) => acc + (req.latencyMs || 0), 0);
 
         return (
-          <div
-            key={request.requestId}
-            onClick={() => onSelectRequest(request)}
-            className="rounded-lg border border-white/8 bg-[#191a1b] p-3.5 transition-all shadow-sm hover:border-white/15 min-w-0 w-full flex flex-col gap-3 cursor-pointer hover:bg-[#1f2022]"
-          >
-            {/* Header info */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0 w-full">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span
-                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${request.status === "completed" ? "bg-[#74a742] shadow-[0_0_8px_rgba(116,167,66,0.4)]" :
-                    request.status === "failed" ? "bg-[#ff6b57] shadow-[0_0_8px_rgba(255,107,87,0.4)]" :
-                      request.status === "cancelled" ? "bg-[#ffbf69] shadow-[0_0_8px_rgba(255,191,105,0.4)]" :
-                        "bg-[#7db1ff] animate-pulse"
-                    }`}
-                />
-                <span className="font-mono text-xs font-semibold text-[#f3f1ea] shrink-0">
-                  {request.requestId.slice(0, 8)}
-                </span>
-                <span className="text-[#555] shrink-0">|</span>
-                <span className="truncate text-xs font-medium text-[#a9aaa7]">
-                  {request.provider} / {request.model}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0 justify-between sm:justify-end">
-                {durationMs !== null && (
-                  <span className="font-mono text-[11px] text-[#7db1ff]">
-                    {durationMs.toLocaleString()} ms
-                  </span>
+          <div key={span.conversationId} className="group w-full min-w-0 rounded-xl border border-white/10 bg-gradient-to-b from-[#1c1d1e] to-[#151617] shadow-sm overflow-hidden transition-all duration-200 hover:border-white/20">
+            {/* Level 1: Chat accordion */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => onToggleSpan(span.conversationId)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onToggleSpan(span.conversationId); }}
+              className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left transition-colors min-w-0 cursor-pointer select-none"
+            >
+              <div className="flex flex-col gap-2 min-w-0 flex-1">
+                <div className="flex items-center gap-2 min-w-0">
+                  <MessageSquareIcon className="size-4 shrink-0 text-[#7d7f79]" />
+                  <span className="font-mono text-xs font-medium text-[#e0e0e0] truncate">{span.conversationId}</span>
+                  <div className="flex flex-wrap items-center gap-1.5 ml-2 shrink-0">
+                    <span className="inline-flex items-center rounded-md bg-white/5 px-2 py-0.5 text-[10px] font-medium text-[#a9aaa7] ring-1 ring-inset ring-white/10">
+                      {pairCount} msg{pairCount !== 1 ? "s" : ""}
+                    </span>
+                    <span className="inline-flex items-center rounded-md bg-white/5 px-2 py-0.5 text-[10px] font-medium text-[#a9aaa7] ring-1 ring-inset ring-white/10">
+                      {span.requests.length} call{span.requests.length !== 1 ? "s" : ""}
+                    </span>
+                    {totalTokens > 0 && (
+                      <span className="inline-flex items-center rounded-md bg-[#7db1ff]/10 px-2 py-0.5 text-[10px] font-medium text-[#7db1ff] ring-1 ring-inset ring-[#7db1ff]/20">
+                        {totalTokens.toLocaleString()} tok
+                      </span>
+                    )}
+                    {totalLatency > 0 && (
+                      <span className="inline-flex items-center rounded-md bg-white/5 px-2 py-0.5 text-[10px] font-medium text-[#a9aaa7] ring-1 ring-inset ring-white/10">
+                        {formatMs(totalLatency)} total
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {lastUserMsg && !isExpanded && (
+                  <p className="text-sm text-[#8b8b8b] truncate pl-6 max-w-full">
+                    <span className="font-medium text-[#a9aaa7]">Latest: </span>
+                    {lastUserMsg.content}
+                  </p>
                 )}
-                <StatusPill status={request.status} />
-                <span className="text-[10px] font-mono text-[#7d7f79]">
-                  {new Date(request.emittedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                </span>
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                <span className="text-xs text-[#7d7f79] hidden sm:block">{new Date(span.lastEventAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                <div className="flex items-center justify-center size-6 rounded-full bg-white/5 transition-colors group-hover:bg-white/10 text-[#e0e0e0]">
+                  {isExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                </div>
               </div>
             </div>
 
-            {/* Timeline/Span visual graph */}
-            <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.04] pt-2.5 min-w-0 w-full">
-              <span className="text-[10px] uppercase tracking-wider text-[#7d7f79] mr-1 shrink-0 font-medium">Timeline:</span>
-              <div className="flex items-center min-w-0 flex-wrap gap-y-1.5">
-                {request.events.map((evt, idx) => {
-                  const isLast = idx === request.events.length - 1;
-                  let nodeColor = "bg-white/20";
-                  if (evt.status === "completed") nodeColor = "bg-[#74a742] shadow-[0_0_6px_rgba(116,167,66,0.4)]";
-                  else if (evt.status === "failed") nodeColor = "bg-[#ff6b57] shadow-[0_0_6px_rgba(255,107,87,0.4)]";
-                  else if (evt.status === "cancelled") nodeColor = "bg-[#ffbf69] shadow-[0_0_6px_rgba(255,191,105,0.4)]";
-                  else if (evt.eventType === "started" || evt.status === "started") nodeColor = "bg-[#7db1ff] shadow-[0_0_6px_rgba(125,177,255,0.4)]";
-                  else if (evt.eventType === "progress" || evt.status === "progress") nodeColor = "bg-[#bfc0bc]";
-
-                  let stepDuration = "";
-                  if (!isLast) {
-                    const nextEvt = request.events[idx + 1];
-                    const diff = new Date(nextEvt.emittedAt).getTime() - new Date(evt.emittedAt).getTime();
-                    stepDuration = diff > 0 ? `${diff}ms` : "";
-                  }
+            {/* Level 1 expanded: message pairs */}
+            {isExpanded && (
+              <div className="border-t border-white/5 bg-[#121314] w-full min-w-0">
+                {span.requests.map((req, reqIdx) => {
+                  const pairKey = `${span.conversationId}:${req.id}`;
+                  const isPairExpanded = expandedPairs[pairKey] ?? false;
+                  const userMsg = userMsgs[reqIdx];
+                  const assistantMsg = assistantMsgs[reqIdx];
+                  const p = parsePreviews(req);
+                  const redactionCount = p?.redactionCount ?? 0;
 
                   return (
-                    <div key={evt.id} className="flex items-center min-w-0 shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectEvent(evt);
-                        }}
-                        title={`Inspect event: ${evt.eventType} (${evt.status})`}
-                        className="group relative flex items-center gap-1.5 rounded-full border border-white/5 bg-[#212121] py-1 px-2.5 transition hover:bg-white/10 hover:border-white/15"
+                    <div key={req.id} className="border-b border-white/[0.04] last:border-b-0 min-w-0 flex flex-col">
+                      {/* Level 2: Message pair accordion */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => togglePair(pairKey)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") togglePair(pairKey); }}
+                        className="w-full flex items-stretch gap-0 text-left hover:bg-white/[0.02] transition-colors relative min-w-0 cursor-pointer select-none"
                       >
-                        <span className={`h-2 w-2 rounded-full ${nodeColor}`} />
-                        <span className="text-[#bfc0bc] font-mono text-[9px] capitalize">{evt.eventType}</span>
-                      </button>
+                        {/* Status line left */}
+                        <div className={`w-1 shrink-0 ${
+                            req.status === "completed" ? "bg-[#74a742]" :
+                            req.status === "failed" ? "bg-[#ff6b57]" :
+                            req.status === "cancelled" ? "bg-[#ffbf69]" :
+                            "bg-[#7db1ff] animate-pulse"
+                          }`} 
+                        />
+                        
+                        <div className="flex-1 flex flex-col py-3 px-4 gap-2 min-w-0 overflow-hidden">
+                           {/* User msg row */}
+                           <div className="flex items-start gap-3 min-w-0">
+                             <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded bg-[#7db1ff]/10 ring-1 ring-[#7db1ff]/20">
+                               <span className="text-[10px] font-bold text-[#7db1ff]">U</span>
+                             </div>
+                             <p className="text-sm text-[#d4d4d4] truncate leading-relaxed">
+                               {userMsg?.content || <span className="text-[#555] italic">Empty message</span>}
+                             </p>
+                           </div>
+                           
+                           {/* Assistant msg row */}
+                           <div className="flex items-start gap-3 min-w-0">
+                             <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded bg-[#74a742]/10 ring-1 ring-[#74a742]/20">
+                               <span className="text-[10px] font-bold text-[#74a742]">A</span>
+                             </div>
+                             <p className="text-sm text-[#a9aaa7] truncate leading-relaxed">
+                               {assistantMsg?.content || <span className="text-[#555] italic">Empty response</span>}
+                             </p>
+                           </div>
+                        </div>
 
-                      {!isLast && (
-                        <div className="flex items-center px-1 justify-center relative w-10 sm:w-12">
-                          <div className="h-[1px] w-full bg-white/10" />
-                          {stepDuration && (
-                            <span className="absolute bg-[#191a1b] px-0.5 text-[8px] font-mono text-[#7d7f79] scale-90">
-                              {stepDuration}
+                        <div className="flex items-center gap-3 shrink-0 px-4">
+                           {redactionCount > 0 && (
+                             <span className="text-[10px] text-[#ffbf69] bg-[#ffbf69]/10 border border-[#ffbf69]/20 px-1.5 py-0.5 rounded font-medium flex items-center gap-1 shrink-0">
+                               <AlertTriangleIcon className="size-2.5" />
+                               {redactionCount}
+                             </span>
+                           )}
+                            <div className="flex flex-col items-end gap-1">
+                             <span className="text-xs font-mono text-[#e0e0e0]">
+                               {req.latencyMs != null ? formatMs(req.latencyMs) : "—"}
+                             </span>
+                             <span className="text-[10px] text-[#7d7f79]">
+                               {req.provider}/{req.model}
+                             </span>
+                           </div>
+                           <div className="text-[#555] transition-colors hover:text-[#e0e0e0]">
+                             {isPairExpanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                           </div>
+                        </div>
+                      </div>
+
+                      {/* Level 2 expanded: span graph + details */}
+                      {isPairExpanded && (
+                        <div className="px-5 pb-5 pt-4 space-y-5 bg-[#0a0a0b] shadow-inner border-y border-white/[0.02] min-w-0">
+                          {/* Span Bar Chart */}
+                          <div className="space-y-2">
+                             <h4 className="text-[10px] font-semibold uppercase tracking-widest text-[#555]">Trace Timeline</h4>
+                             <SpanBar events={req.events} totalLatencyMs={req.latencyMs} />
+                          </div>
+
+                          {/* Meta tags */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center rounded bg-[#1e1f21] px-2 py-1 text-[10px] font-medium text-[#d4d4d4] ring-1 ring-inset ring-white/10">
+                              <Terminal className="size-3 mr-1.5 text-[#8b8b8b]" />
+                              {req.provider} / {req.model}
                             </span>
-                          )}
+                            {req.totalTokens != null && (
+                               <span className="inline-flex items-center rounded bg-[#1e1f21] px-2 py-1 text-[10px] font-medium text-[#d4d4d4] ring-1 ring-inset ring-white/10">
+                                  <ActivityIcon className="size-3 mr-1.5 text-[#8b8b8b]" />
+                                  {req.totalTokens.toLocaleString()} tokens
+                               </span>
+                            )}
+                            {redactionCount > 0 && (
+                               <span className="inline-flex items-center rounded bg-[#33240f] px-2 py-1 text-[10px] font-medium text-[#ffbf69] ring-1 ring-inset ring-[#ffbf69]/20">
+                                  <AlertTriangleIcon className="size-3 mr-1.5 text-[#ffbf69]" />
+                                  {redactionCount} Redacted PII
+                               </span>
+                            )}
+                            {req.error && (
+                               <span className="inline-flex items-center rounded bg-[#3a1714] px-2 py-1 text-[10px] font-medium text-[#ff8a7a] ring-1 ring-inset ring-[#ff6b57]/20">
+                                  <AlertTriangleIcon className="size-3 mr-1.5" />
+                                  Error occurred
+                               </span>
+                            )}
+                          </div>
+
+                          {/* Previews */}
+                          {(() => {
+                            if (!p || p.disabled) return null;
+                            return (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {p.input && (
+                                  <div className="rounded-lg bg-[#141516] border border-white/5 overflow-hidden flex flex-col min-w-0">
+                                    <div className="bg-[#1c1d1e] border-b border-white/5 px-3 py-2 flex justify-between items-center">
+                                       <span className="text-[10px] font-medium uppercase tracking-wider text-[#a9aaa7]">Redacted Input Payload</span>
+                                    </div>
+                                    <div className="p-3 max-h-60 overflow-y-auto">
+                                       <span className="text-[11px] font-mono text-[#d4d4d4] whitespace-pre-wrap leading-relaxed break-words">{p.input}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {p.output && (
+                                  <div className="rounded-lg bg-[#141516] border border-white/5 overflow-hidden flex flex-col min-w-0">
+                                    <div className="bg-[#1c1d1e] border-b border-white/5 px-3 py-2 flex justify-between items-center">
+                                       <span className="text-[10px] font-medium uppercase tracking-wider text-[#a9aaa7]">Redacted Output Payload</span>
+                                    </div>
+                                    <div className="p-3 max-h-60 overflow-y-auto">
+                                       <span className="text-xs font-mono text-[#d4d4d4] whitespace-pre-wrap leading-relaxed break-words">{p.output}</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
                     </div>
                   );
                 })}
               </div>
-            </div>
+            )}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function SpanBar({
+  events,
+  totalLatencyMs,
+}: {
+  events: Array<{ eventType: string; status: string; emittedAt: string }>;
+  totalLatencyMs: number | null;
+}) {
+  const sorted = useMemo(() =>
+    [...events].sort((a, b) => new Date(a.emittedAt).getTime() - new Date(b.emittedAt).getTime()),
+    [events]
+  );
+
+  if (sorted.length < 2 || totalLatencyMs == null || totalLatencyMs <= 0) {
+    return (
+      <div className="h-8 rounded-md bg-white/[0.02] border border-white/5 flex items-center justify-center">
+        <span className="text-[10px] text-[#555] font-mono">Insufficient span data</span>
+      </div>
+    );
+  }
+
+  const traceStart = new Date(sorted[0].emittedAt).getTime();
+  const totalMs = totalLatencyMs;
+
+  type Phase = { label: string; startPct: number; widthPct: number; color: string; duration: number };
+  const phases: Phase[] = [];
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const curr = sorted[i];
+    const next = sorted[i + 1];
+    const startMs = new Date(curr.emittedAt).getTime() - traceStart;
+    const durMs = Math.max(1, new Date(next.emittedAt).getTime() - new Date(curr.emittedAt).getTime());
+    const widthPct = (durMs / totalMs) * 100;
+    const startPct = (startMs / totalMs) * 100;
+
+    let label = "";
+    let color = "";
+
+    if (curr.eventType === "started" && next.eventType === "first_token") {
+      label = "TTFT";
+      color = "bg-[#7db1ff]";
+    } else if (curr.eventType === "first_token" && (next.eventType === "progress" || next.eventType === "completed")) {
+      label = "STREAM";
+      color = "bg-[#b46aff]";
+    } else if (next.eventType === "completed") {
+      label = "FINISH";
+      color = "bg-[#74a742]";
+    } else if (next.eventType === "failed") {
+      label = "FAIL";
+      color = "bg-[#ff6b57]";
+    } else if (next.eventType === "cancelled") {
+      label = "CANCEL";
+      color = "bg-[#ffbf69]";
+    } else {
+      label = curr.eventType.toUpperCase();
+      color = "bg-white/15";
+    }
+
+    phases.push({ label, startPct, widthPct: Math.max(widthPct, 0.5), color, duration: durMs });
+  }
+
+  const formatTime = (ms: number) => ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${Math.round(ms)}ms`;
+
+  return (
+    <div className="w-full flex flex-col gap-2 min-w-0">
+      {/* Visual Timeline Bar */}
+      <div className="relative h-6 w-full rounded bg-[#1c1d1e] border border-white/5 overflow-hidden shadow-inner flex">
+        {phases.map((phase, i) => (
+          <div
+            key={i}
+            className={`h-full ${phase.color} opacity-90 transition-opacity hover:opacity-100 flex items-center justify-center overflow-hidden border-r border-black/20 last:border-r-0`}
+            style={{ width: `${phase.widthPct}%` }}
+            title={`${phase.label}: ${formatTime(phase.duration)}`}
+          >
+             {phase.widthPct > 5 && (
+                 <span className="text-[9px] font-bold text-black/60 truncate px-1">
+                    {phase.label}
+                 </span>
+             )}
+          </div>
+        ))}
+      </div>
+
+      {/* Breakdown Legend */}
+      <div className="flex flex-wrap items-center gap-4 mt-1 bg-[#141516] p-2 rounded-md border border-white/[0.02]">
+        {phases.map((phase, i) => (
+          <div key={i} className="flex flex-col min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className={`w-2 h-2 rounded-sm shrink-0 ${phase.color}`} />
+              <span className="text-[9px] font-bold tracking-wider text-[#a9aaa7] truncate">{phase.label}</span>
+            </div>
+            <span className="text-[11px] font-mono text-[#d4d4d4] pl-3.5 whitespace-nowrap">
+              {formatTime(phase.duration)} <span className="text-[#555] text-[9px]">({Math.round(phase.widthPct)}%)</span>
+            </span>
+          </div>
+        ))}
+        <div className="flex flex-col ml-auto pl-4 border-l border-white/10 shrink-0">
+           <span className="text-[9px] font-bold tracking-wider text-[#a9aaa7] mb-0.5">TOTAL</span>
+           <span className="text-[11px] font-mono text-[#7db1ff]">{formatTime(totalMs)}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -944,216 +1155,11 @@ function parsePreviews(event: any): { input?: string; output?: string; disabled?
   return previews || null;
 }
 
-function OTelSpanGraph({ request }: { request: GroupedRequest }) {
-  const sortedEvents = useMemo(() => {
-    return [...request.events].sort(
-      (a, b) => new Date(a.emittedAt).getTime() - new Date(b.emittedAt).getTime()
-    );
-  }, [request.events]);
-
-  const [hoveredSpan, setHoveredSpan] = useState<{
-    name: string;
-    durationMs: number;
-    left: number;
-    width: number;
-    startOffsetMs: number;
-    status?: string;
-  } | null>(null);
-
-  if (sortedEvents.length < 2) {
-    return (
-      <div className="text-xs text-[#a9aaa7] italic p-4 bg-[#191a1b] rounded-xl border border-white/[0.05]">
-        Not enough telemetry events to construct a span graph (requires at least 2 events).
-      </div>
-    );
-  }
-
-  const traceStart = new Date(sortedEvents[0].emittedAt).getTime();
-  const traceEnd = new Date(sortedEvents[sortedEvents.length - 1].emittedAt).getTime();
-  const totalDurationMs = Math.max(1, traceEnd - traceStart);
-
-  const formatTime = (ms: number) => {
-    if (ms >= 1000) {
-      return `${(ms / 1000).toFixed(2)}s`;
-    }
-    return `${ms.toFixed(1)}ms`;
-  };
-
-  const getSpanStyle = (name: string, status?: string) => {
-    // Explicit states
-    if (status === "failed") return { bg: "bg-[#ff6b57]/20", border: "border-[#ff6b57]/30", text: "text-[#ffb8ad]" };
-    if (status === "cancelled") return { bg: "bg-[#ffbf69]/20", border: "border-[#ffbf69]/30", text: "text-[#ffd699]" };
-    
-    const lower = name.toLowerCase();
-    if (lower.includes("completed") || lower.includes("success")) return { bg: "bg-[#74a742]/10", border: "border-[#74a742]/20", text: "text-[#a7e370]" };
-    if (lower.includes("overall")) return { bg: "bg-[#7db1ff]/10", border: "border-[#7db1ff]/20", text: "text-[#adcfff]" };
-
-    // Semantic engineering colors
-    if (lower.includes("db") || lower.includes("query") || lower.includes("prisma") || lower.includes("sql")) {
-      return { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-300" };
-    }
-    if (lower.includes("fetch") || lower.includes("http") || lower.includes("request") || lower.includes("api") || lower.includes("route")) {
-      return { bg: "bg-sky-500/10", border: "border-sky-500/30", text: "text-sky-300" };
-    }
-    if (lower.includes("llm") || lower.includes("model") || lower.includes("generate") || lower.includes("inference") || lower.includes("prompt")) {
-      return { bg: "bg-purple-500/10", border: "border-purple-500/30", text: "text-purple-300" };
-    }
-    if (lower.includes("embed") || lower.includes("vector") || lower.includes("pinecone") || lower.includes("search")) {
-      return { bg: "bg-teal-500/10", border: "border-teal-500/30", text: "text-teal-300" };
-    }
-    if (lower.includes("cache") || lower.includes("redis")) {
-      return { bg: "bg-pink-500/10", border: "border-pink-500/30", text: "text-pink-300" };
-    }
-    if (lower.includes("parse") || lower.includes("validate") || lower.includes("transform")) {
-      return { bg: "bg-indigo-500/10", border: "border-indigo-500/30", text: "text-indigo-300" };
-    }
-
-    // Default hash-based vibrant colors for unknown events
-    const colors = [
-      { bg: "bg-rose-500/10", border: "border-rose-500/20", text: "text-rose-300" },
-      { bg: "bg-fuchsia-500/10", border: "border-fuchsia-500/20", text: "text-fuchsia-300" },
-      { bg: "bg-blue-500/10", border: "border-blue-500/20", text: "text-blue-300" },
-      { bg: "bg-cyan-500/10", border: "border-cyan-500/20", text: "text-cyan-300" },
-      { bg: "bg-emerald-500/10", border: "border-emerald-500/20", text: "text-emerald-300" },
-      { bg: "bg-orange-500/10", border: "border-orange-500/20", text: "text-orange-300" },
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-  };
-
-  const mainSpan = {
-    name: `${request.provider} / ${request.model}`,
-    left: 0,
-    width: 100,
-    durationMs: totalDurationMs,
-    startOffsetMs: 0,
-    status: request.status,
-    ...getSpanStyle("overall", request.status),
-  };
-
-  const childSpans = [];
-  for (let i = 0; i < sortedEvents.length - 1; i++) {
-    const startEvt = sortedEvents[i];
-    const endEvt = sortedEvents[i + 1];
-    const startMs = new Date(startEvt.emittedAt).getTime() - traceStart;
-    const durationMs = Math.max(1, new Date(endEvt.emittedAt).getTime() - new Date(startEvt.emittedAt).getTime());
-
-    const leftPercent = (startMs / totalDurationMs) * 100;
-    const widthPercent = (durationMs / totalDurationMs) * 100;
-
-    let name = `${startEvt.eventType} → ${endEvt.eventType}`;
-
-    childSpans.push({
-      name,
-      left: leftPercent,
-      width: Math.max(0.5, widthPercent),
-      durationMs,
-      startOffsetMs: startMs,
-      status: endEvt.status,
-      ...getSpanStyle(name, endEvt.status),
-    });
-  }
-
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((p) => p * totalDurationMs);
-
-  return (
-    <div className="flex flex-col gap-3 w-full animate-in fade-in duration-300">
-      <div className="flex items-center justify-between px-1">
-        <h4 className="font-semibold text-xs text-[#a9aaa7] uppercase tracking-widest flex items-center gap-2">
-          Trace Timeline
-        </h4>
-        <span className="font-mono text-xs text-[#7d7f79]">{formatTime(totalDurationMs)}</span>
-      </div>
-
-      <div className="relative rounded-xl border border-white/5 bg-[#121314] p-5 shadow-sm overflow-hidden select-none">
-        {/* Ticks & Grid */}
-        <div className="absolute inset-x-5 top-8 bottom-5 pointer-events-none">
-          {ticks.map((tick, i) => (
-            <div
-              key={i}
-              className="absolute top-0 bottom-0 border-l border-dashed border-white/10"
-              style={{ left: `${(tick / totalDurationMs) * 100}%` }}
-            >
-              <span className="absolute -top-6 -translate-x-1/2 text-[9px] font-mono text-[#7d7f79] opacity-70">
-                {formatTime(tick)}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-6 flex flex-col gap-2 relative z-10 min-w-[400px]">
-          {/* Main Span */}
-          <div className="relative h-8 w-full flex items-center">
-            <div
-              className={`absolute inset-y-0 rounded-md border ${mainSpan.bg} ${mainSpan.border} flex items-center px-2.5 transition-all hover:brightness-125 hover:z-20 cursor-default group overflow-hidden`}
-              style={{ left: `${mainSpan.left}%`, width: `${mainSpan.width}%` }}
-              onMouseEnter={() => setHoveredSpan(mainSpan)}
-              onMouseLeave={() => setHoveredSpan(null)}
-            >
-              <span className={`text-[10px] font-semibold truncate ${mainSpan.text}`}>
-                Overall Phase
-              </span>
-            </div>
-          </div>
-
-          {/* Child Spans */}
-          <div className="relative h-6 w-full flex items-center mt-1">
-            {childSpans.map((span, idx) => (
-              <div
-                key={idx}
-                className={`absolute inset-y-0 rounded-md border ${span.bg} ${span.border} flex items-center px-1.5 transition-all hover:brightness-125 hover:scale-y-110 hover:z-20 cursor-default shadow-sm overflow-hidden`}
-                style={{ left: `${span.left}%`, width: `${span.width}%` }}
-                onMouseEnter={() => setHoveredSpan(span)}
-                onMouseLeave={() => setHoveredSpan(null)}
-              >
-                {span.width > 12 && (
-                  <span className={`text-[9px] font-mono truncate ${span.text} mx-auto opacity-80 font-medium`}>
-                    {formatTime(span.durationMs)}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Hover Tooltip */}
-        {hoveredSpan && (
-          <div className="absolute bottom-4 right-4 z-30 pointer-events-none">
-            <div className="bg-[#191a1b]/95 backdrop-blur-md border border-white/10 rounded-lg p-3 shadow-2xl inline-block max-w-[300px] animate-in fade-in slide-in-from-bottom-2 duration-150">
-              <div className="flex flex-col gap-2.5 text-xs font-mono">
-                <div className="flex flex-col gap-1">
-                  <span className="text-[#7d7f79] text-[9px] uppercase tracking-wider font-sans">Stage</span>
-                  <span className={`${hoveredSpan.status === "failed" ? "text-[#ffb8ad]" : hoveredSpan.status === "cancelled" ? "text-[#ffd699]" : "text-white"} font-medium truncate`}>
-                    {hoveredSpan.name}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[#7d7f79] text-[9px] uppercase tracking-wider font-sans">Duration</span>
-                    <span className="text-[#74a742] font-semibold">{formatTime(hoveredSpan.durationMs)}</span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[#7d7f79] text-[9px] uppercase tracking-wider font-sans">Offset</span>
-                    <span className="text-sky-400">+{formatTime(hoveredSpan.startOffsetMs)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function DetailDrawer({
   detail,
   onClose,
 }: {
-  detail: { type: "run" | "event" | "grouped-request"; data: any } | null;
+  detail: { type: "run" | "event"; data: any } | null;
   onClose: () => void;
 }) {
   const [copiedInput, setCopiedInput] = useState(false);
@@ -1184,226 +1190,6 @@ function DetailDrawer({
   const toggleEventExpand = (evtId: string) => {
     setExpandedEvents((prev) => ({ ...prev, [evtId]: !prev[evtId] }));
   };
-
-  // Grouped Request Detail View
-  if (detail.type === "grouped-request") {
-    const request = data as GroupedRequest;
-    const durationMs = request.latencyMs ?? (request.startedAt && request.completedAt
-      ? new Date(request.completedAt).getTime() - new Date(request.startedAt).getTime()
-      : null);
-
-    return (
-      <>
-        {/* Backdrop */}
-        <div
-          onClick={onClose}
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-md transition-opacity duration-300"
-        />
-
-        {/* Drawer */}
-        <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-3xl flex-col border-l border-white/10 bg-[#0a0a0a] shadow-2xl transition-transform duration-300 transform translate-x-0">
-          <div className="flex items-center justify-between px-8 py-6 border-b border-white/5 bg-gradient-to-b from-white/[0.04] to-transparent">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-[#7db1ff] flex items-center gap-1.5">
-                Live Telemetry Trace
-              </span>
-              <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-3">
-                {request.provider} <span className="text-white/20">/</span> {request.model}
-              </h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="rounded-full p-2.5 text-[#8b8b8b] hover:bg-white/10 hover:text-white transition-colors ring-1 ring-white/5"
-            >
-              <X className="size-5" />
-            </button>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8 text-sm custom-scrollbar">
-            {/* Key Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col gap-1.5 shadow-sm">
-                <span className="text-[10px] uppercase tracking-wider text-[#7d7f79] font-medium">Status</span>
-                <div><StatusPill status={request.status} /></div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col gap-1.5 shadow-sm">
-                <span className="text-[10px] uppercase tracking-wider text-[#7d7f79] font-medium">Latency</span>
-                <p className="font-mono text-lg font-medium text-white drop-shadow-sm">
-                  {durationMs !== null ? `${durationMs.toLocaleString()} ms` : "-"}
-                </p>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 flex flex-col gap-1.5 col-span-2 shadow-sm">
-                <span className="text-[10px] uppercase tracking-wider text-[#7d7f79] font-medium">Request ID</span>
-                <p className="font-mono text-sm text-[#bfc0bc] truncate opacity-90" title={request.requestId}>
-                  {request.requestId}
-                </p>
-              </div>
-            </div>
-
-            {/* OTel Span Graph */}
-            <OTelSpanGraph request={request} />
-
-            {/* Vertical Flow Timeline */}
-            <div className="rounded-xl border border-white/10 bg-[#121314] overflow-hidden shadow-sm">
-              <div className="px-5 py-4 border-b border-white/5 bg-white/[0.01]">
-                <h4 className="font-semibold text-xs text-[#a9aaa7] uppercase tracking-widest flex items-center gap-2">
-                  Execution Timeline
-                </h4>
-              </div>
-
-              <div className="p-6 relative max-h-[400px] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
-                {/* Continuous Timeline Line */}
-                <div className="absolute left-[31px] top-8 bottom-8 w-[2px] bg-gradient-to-b from-white/10 via-white/5 to-transparent rounded-full" />
-
-                <div className="space-y-8">
-                  {request.events.map((evt, idx) => {
-                    const isLast = idx === request.events.length - 1;
-                    let nodeColor = "bg-white/20 ring-white/10";
-                    let glowColor = "";
-                    if (evt.status === "completed") {
-                      nodeColor = "bg-[#74a742] ring-[#74a742]/30";
-                      glowColor = "shadow-[0_0_12px_rgba(116,167,66,0.6)]";
-                    } else if (evt.status === "failed") {
-                      nodeColor = "bg-[#ff6b57] ring-[#ff6b57]/30";
-                      glowColor = "shadow-[0_0_12px_rgba(255,107,87,0.6)]";
-                    } else if (evt.status === "cancelled") {
-                      nodeColor = "bg-[#ffbf69] ring-[#ffbf69]/30";
-                      glowColor = "shadow-[0_0_12px_rgba(255,191,105,0.6)]";
-                    } else if (evt.eventType === "started" || evt.status === "started") {
-                      nodeColor = "bg-[#7db1ff] ring-[#7db1ff]/30";
-                      glowColor = "shadow-[0_0_12px_rgba(125,177,255,0.6)]";
-                    } else if (evt.eventType === "progress" || evt.status === "progress") {
-                      nodeColor = "bg-[#bfc0bc] ring-white/20";
-                    }
-
-                    let stepDuration = "";
-                    if (!isLast) {
-                      const nextEvt = request.events[idx + 1];
-                      const diff = new Date(nextEvt.emittedAt).getTime() - new Date(evt.emittedAt).getTime();
-                      stepDuration = diff > 0 ? `+${diff}ms` : "";
-                    }
-
-                    return (
-                      <div key={evt.id} className="relative flex gap-6 group">
-                        {/* Timeline Node */}
-                        <div className="relative flex flex-col items-center w-4 shrink-0 justify-center">
-                          <div className={`z-10 h-4 w-4 rounded-full ring-4 ${nodeColor} ${glowColor} border-2 border-[#121314] transition-all duration-300 group-hover:scale-110`} />
-                        </div>
-
-                        {/* Timeline Content */}
-                        <div className="flex-1 pb-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-white capitalize tracking-wide text-[13px]">
-                                {evt.eventType}
-                              </span>
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-mono uppercase bg-white/5 text-[#a9aaa7] border border-white/5">
-                                {evt.status}
-                              </span>
-                            </div>
-                            <span className="font-mono text-xs text-[#7d7f79]">
-                              {new Date(evt.emittedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 })}
-                            </span>
-                          </div>
-
-                          {stepDuration && (
-                            <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#7db1ff]/10 text-[#7db1ff] text-[10px] font-mono ring-1 ring-[#7db1ff]/20">
-                              <span className="text-[#7db1ff]/70 text-[9px]">delay:</span> {stepDuration}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Individual Event Logs / Previews */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-xs text-[#a9aaa7] uppercase tracking-widest pl-1">Event Payloads</h4>
-
-              <div className="flex flex-col gap-3">
-                {request.events.map((evt) => {
-                  const isExpanded = expandedEvents[evt.id] ?? false;
-                  const p = parsePreviews(evt);
-                  const evtInput = p?.input ?? "";
-                  const evtOutput = p?.output ?? "";
-                  const evtDisabled = p?.disabled ?? false;
-
-                  return (
-                    <div key={evt.id} className="rounded-xl border border-white/10 bg-[#121314] overflow-hidden transition-all duration-200">
-                      <button
-                        onClick={() => toggleEventExpand(evt.id)}
-                        className="w-full flex items-center justify-between px-5 py-3.5 bg-white/[0.02] hover:bg-white/[0.04] transition-colors text-left focus:outline-none"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-sm font-semibold text-[#ececec] capitalize">
-                            {evt.eventType}
-                          </span>
-                          <StatusPill status={evt.status} />
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-[#7d7f79]">
-                          <span className="font-mono bg-white/5 px-2 py-0.5 rounded text-[10px] hidden sm:block">
-                            {evt.id.slice(0, 12)}...
-                          </span>
-                          <span className="text-[10px] font-medium uppercase tracking-wider">{isExpanded ? "Collapse" : "Expand"}</span>
-                        </div>
-                      </button>
-
-                      {isExpanded && (
-                        <div className="p-5 space-y-5 border-t border-white/5 text-[13px] font-mono bg-black/20">
-                          {evt.latencyMs !== null && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-[#7d7f79]">Latency:</span>
-                              <span className="text-[#7db1ff] bg-[#7db1ff]/10 px-1.5 py-0.5 rounded">{evt.latencyMs} ms</span>
-                            </div>
-                          )}
-                          {!!evt.error && (
-                            <div className="rounded-lg border border-red-500/20 bg-red-950/20 p-4 relative overflow-hidden shadow-inner">
-                              <div className="absolute top-0 left-0 w-1 h-full bg-red-500/50" />
-                              <span className="text-red-400 font-bold block mb-2 uppercase text-[10px] tracking-wider">Error Details</span>
-                              <pre className="text-red-300/90 whitespace-pre-wrap leading-relaxed font-sans text-sm">
-                                {describeError(evt.error)}
-                              </pre>
-                            </div>
-                          )}
-                          {evtDisabled ? (
-                            <div className="italic text-[#7d7f79] flex items-center gap-2 bg-white/5 p-3 rounded-lg border border-white/5">
-                              Telemetry previews disabled for this event.
-                            </div>
-                          ) : (
-                            <div className="space-y-4">
-                              {evtInput && (
-                                <div className="space-y-2">
-                                  <span className="text-[#7d7f79] uppercase text-[10px] tracking-wider font-semibold">Redacted Input</span>
-                                  <div className="p-3.5 rounded-lg bg-[#0a0a0a] text-[#a9aaa7] max-h-60 overflow-y-auto whitespace-pre-wrap leading-relaxed font-sans border border-white/5 ring-1 ring-inset ring-white/5 custom-scrollbar shadow-inner">
-                                    {evtInput}
-                                  </div>
-                                </div>
-                              )}
-                              {evtOutput && (
-                                <div className="space-y-2">
-                                  <span className="text-[#7d7f79] uppercase text-[10px] tracking-wider font-semibold">Redacted Output</span>
-                                  <div className="p-3.5 rounded-lg bg-[#0a0a0a] text-[#a9aaa7] max-h-60 overflow-y-auto whitespace-pre-wrap leading-relaxed font-sans border border-white/5 ring-1 ring-inset ring-white/5 custom-scrollbar shadow-inner">
-                                    {evtOutput}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
 
   // Fallback / Standard Detail View (for run or event)
   const isRun = detail.type === "run";
