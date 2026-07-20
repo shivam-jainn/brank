@@ -58,7 +58,7 @@ export const POST = withLogging(async function POST(req: Request) {    const { m
     const session = auth.api?.getSession
       ? await auth.api.getSession({ headers: req.headers }).catch(() => null)
       : null;
-    const userId = session?.user?.id;
+    const userId = session?.user?.id ?? 'anonymous-user';
 
     await persistChatRequest({
         conversationId,

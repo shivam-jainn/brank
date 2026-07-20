@@ -17,6 +17,7 @@
     "db:migrate": "prisma migrate deploy",
     "test:inferhence": "bun test packages/inferhence/test",
     "test:ingestion": "bun test packages/ingestion/test",
+    "postinstall": "prisma generate",
     "compose:up": "docker-compose up --build"
   },
   "dependencies": {

@@ -5,7 +5,7 @@ import { invalidateConversationCache } from "@/lib/chat-cache";
 type PersistChatRequestOptions = {
   conversationId: string;
   sessionId?: string;
-  userId?: string;
+  userId: string;
   requestId: string;
   traceId: string;
   provider: string;
@@ -61,15 +61,10 @@ export async function persistChatRequest({
       });
     }
 
-    if (userId) {
-      await tx.conversation.updateMany({
-        where: { id: conversationId, userId: null },
-        data: { userId },
-      });
-    }
-
     await appendChatMessages(tx, {
       conversationId,
+      sessionId,
+      userId,
       provider,
       model,
       requestId,
@@ -116,15 +111,10 @@ export async function persistChatResponse({
       });
     }
 
-    if (userId) {
-      await tx.conversation.updateMany({
-        where: { id: conversationId, userId: null },
-        data: { userId },
-      });
-    }
-
     await appendChatMessages(tx, {
       conversationId,
+      sessionId,
+      userId,
       provider,
       model,
       requestId,
@@ -146,7 +136,7 @@ async function appendChatMessages(
     requestId,
     traceId,
     messages,
-  }: PersistChatRequestOptions,
+  }: PersistChatRequestOptions & { conversationId: string }
 ): Promise<void> {
   const [latestMessage, existingMessages] = await Promise.all([
     tx.chatMessage.findFirst({
