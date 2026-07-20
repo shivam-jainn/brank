@@ -199,3 +199,8 @@
     display: none;
   }
 }
+
+.sidebar-dropdown-content {
+  --accent: rgba(0, 0, 0, 0.25);
+  --accent-foreground: #ececec;
+}
