@@ -8,7 +8,7 @@ import { getPrismaClient } from "@/lib/db";
 const prisma = getPrismaClient();
 
 if (!prisma) {
-  throw new Error("Better Auth requires DATABASE_URL to be configured.");
+  console.warn("Better Auth requires DATABASE_URL to be configured; auth is disabled.");
 }
 
 const socialProviders = {
@@ -31,18 +31,29 @@ const socialProviders = {
     : {}),
 };
 
-export const auth = betterAuth({
-  baseURL: appConfig.auth.url,
-  secret: appConfig.auth.secret,
-  database: prismaAdapter(prisma, {
-    provider: "postgresql",
-  }),
-  socialProviders,
-  plugins: isGuestLoginEnabled ? [anonymous()] : [],
-  account: {
-    accountLinking: {
-      enabled: true,
-      trustedProviders: ["google", "github"],
-    },
-  },
-});
+export const auth = (() => {
+  if (!prisma) {
+    return {} as ReturnType<typeof betterAuth>;
+  }
+
+  try {
+    return betterAuth({
+      baseURL: appConfig.auth.url,
+      secret: appConfig.auth.secret,
+      database: prismaAdapter(prisma, {
+        provider: "postgresql",
+      }),
+      socialProviders,
+      plugins: isGuestLoginEnabled ? [anonymous()] : [],
+      account: {
+        accountLinking: {
+          enabled: true,
+          trustedProviders: ["google", "github"],
+        },
+      },
+    });
+  } catch (error) {
+    console.warn("Failed to initialize Better Auth; auth is disabled.", error);
+    return {} as ReturnType<typeof betterAuth>;
+  }
+})();
