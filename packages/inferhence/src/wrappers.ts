@@ -249,12 +249,30 @@ async function* readableStreamToAsyncIterable<TChunk>(
 }
 
 function isAbortError(error: unknown): boolean {
+  if (error && typeof error === "object") {
+    const status = (error as any).statusCode ?? (error as any).status;
+    if (typeof status === "number" && status >= 400) {
+      return false;
+    }
+  }
   if (error instanceof DOMException && error.name === "AbortError") {
     return true;
   }
   if (error instanceof Error) {
     const name = error.name;
     const msg = error.message.toLowerCase();
+    if (
+      msg.includes("429") ||
+      msg.includes("rate limit") ||
+      msg.includes("too many requests") ||
+      msg.includes("401") ||
+      msg.includes("unauthorized") ||
+      msg.includes("403") ||
+      msg.includes("forbidden") ||
+      msg.includes("500")
+    ) {
+      return false;
+    }
     return name === "AbortError" || msg.includes("abort") || msg.includes("cancel");
   }
   return false;

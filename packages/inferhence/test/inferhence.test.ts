@@ -277,6 +277,31 @@ describe("events and wrappers", () => {
     expect(transport.events.map((event) => event.eventType)).toEqual(["started", "cancelled"]);
     expect(transport.events.at(-1)?.status).toBe("cancelled");
   });
+
+  test("emits failed (not cancelled) when a rate limit error is thrown", async () => {
+    const transport = createMemoryTransport();
+    const stream = withReadableStreamingInference("input", () => new ReadableStream<string>({
+      start(controller) {
+        const error = new Error("Rate limit exceeded");
+        (error as any).statusCode = 429;
+        controller.error(error);
+      },
+    }), {
+      metadata,
+      transport,
+      clock: clockFactory(1_000, 1_100),
+      idFactory: () => "id",
+    });
+
+    const reader = stream.getReader();
+    await expect(reader.read()).rejects.toThrow("Rate limit exceeded");
+
+    expect(transport.events.map((event) => event.eventType)).toEqual([
+      "started",
+      "failed",
+    ]);
+    expect(transport.events.at(-1)?.status).toBe("failed");
+  });
 });
 
 describe("example integration", () => {

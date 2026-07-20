@@ -2,15 +2,140 @@ import { getPrismaClient } from "@/lib/db";
 import { getIngestionService } from "@/lib/ingestion-service";
 import { withLogging } from "@/lib/logger";
 
-async function getMetricsData() {
+function getRangeConfig(range: string) {
+  const now = new Date();
+  switch (range) {
+    case "1h":
+      return {
+        startDate: new Date(now.getTime() - 60 * 60 * 1000),
+        bucketCount: 60,
+      };
+    case "3h":
+      return {
+        startDate: new Date(now.getTime() - 3 * 60 * 60 * 1000),
+        bucketCount: 60,
+      };
+    case "6h":
+      return {
+        startDate: new Date(now.getTime() - 6 * 60 * 60 * 1000),
+        bucketCount: 60,
+      };
+    case "12h":
+      return {
+        startDate: new Date(now.getTime() - 12 * 60 * 60 * 1000),
+        bucketCount: 60,
+      };
+    case "24h":
+    case "1d":
+      return {
+        startDate: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+        bucketCount: 24,
+      };
+    case "7d":
+    case "1w":
+      return {
+        startDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+        bucketCount: 28, // 4 buckets per day
+      };
+    case "30d":
+    case "1m":
+      return {
+        startDate: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+        bucketCount: 30, // 1 bucket per day
+      };
+    default:
+      return {
+        startDate: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+        bucketCount: 24,
+      };
+  }
+}
+
+export async function getMetricsData(
+  range: string = "24h",
+  provider: string = "all",
+  model: string = "all",
+  status: string = "all"
+) {
   const prisma = getPrismaClient();
   if (!prisma) {
     throw new Error("DATABASE_URL is required");
   }
 
   const now = new Date();
+  const { startDate, bucketCount } = getRangeConfig(range);
   const lastHour = new Date(now.getTime() - 60 * 60 * 1000);
   const lastDay = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
+  // We query from whichever is earlier: the start of selected range or 24 hours ago (needed for lastDay trend)
+  const queryStartDate = startDate < lastDay ? startDate : lastDay;
+
+  // Build prisma filter conditions
+  const eventWhere: any = { emittedAt: { gte: queryStartDate } };
+  if (provider && provider !== "all") {
+    eventWhere.provider = provider;
+  }
+  if (model && model !== "all") {
+    eventWhere.model = model;
+  }
+  if (status && status !== "all") {
+    eventWhere.status = status;
+  }
+
+  const messageWhere: any = {};
+  if (provider && provider !== "all") {
+    messageWhere.provider = provider;
+  }
+  if (model && model !== "all") {
+    messageWhere.model = model;
+  }
+
+  const conversationWhere: any = {};
+  if (provider && provider !== "all") {
+    conversationWhere.inferenceEvents = {
+      some: { provider }
+    };
+  }
+  if (model && model !== "all") {
+    conversationWhere.inferenceEvents = {
+      ...conversationWhere.inferenceEvents,
+      some: {
+        ...(conversationWhere.inferenceEvents?.some || {}),
+        model
+      }
+    };
+  }
+  if (status && status !== "all") {
+    conversationWhere.inferenceEvents = {
+      ...conversationWhere.inferenceEvents,
+      some: {
+        ...(conversationWhere.inferenceEvents?.some || {}),
+        status
+      }
+    };
+  }
+
+  const recentWhere: any = { emittedAt: { gte: lastHour } };
+  if (provider && provider !== "all") {
+    recentWhere.provider = provider;
+  }
+  if (model && model !== "all") {
+    recentWhere.model = model;
+  }
+  if (status && status !== "all") {
+    recentWhere.status = status;
+  }
+
+  const providerQueryWhere: any = {};
+  if (model && model !== "all") {
+    providerQueryWhere.model = model;
+  }
+
+  const modelQueryWhere: any = {};
+  if (provider && provider !== "all") {
+    modelQueryWhere.provider = provider;
+  }
+
   const [
     totalEvents,
     completed,
@@ -21,16 +146,18 @@ async function getMetricsData() {
     totalConversations,
     events,
     recent,
+    providersList,
+    modelsList,
   ] = await Promise.all([
-    prisma.inferenceEvent.count(),
-    prisma.inferenceEvent.count({ where: { status: "completed" } }),
-    prisma.inferenceEvent.count({ where: { status: "failed" } }),
-    prisma.inferenceEvent.count({ where: { status: "cancelled" } }),
-    prisma.chatMessage.count(),
-    prisma.chatMessage.count({ where: { createdAt: { gte: lastHour } } }),
-    prisma.conversation.count(),
+    prisma.inferenceEvent.count({ where: eventWhere }),
+    prisma.inferenceEvent.count({ where: { ...eventWhere, status: "completed" } }),
+    prisma.inferenceEvent.count({ where: { ...eventWhere, status: "failed" } }),
+    prisma.inferenceEvent.count({ where: { ...eventWhere, status: "cancelled" } }),
+    prisma.chatMessage.count({ where: messageWhere }),
+    prisma.chatMessage.count({ where: { ...messageWhere, createdAt: { gte: lastHour } } }),
+    prisma.conversation.count({ where: conversationWhere }),
     prisma.inferenceEvent.findMany({
-      where: { emittedAt: { gte: lastDay } },
+      where: eventWhere,
       orderBy: { emittedAt: "asc" },
       take: 5000,
       select: {
@@ -56,7 +183,7 @@ async function getMetricsData() {
       },
     }),
     prisma.inferenceEvent.findMany({
-      where: { emittedAt: { gte: lastHour } },
+      where: recentWhere,
       orderBy: { emittedAt: "desc" },
       take: 100,
       select: {
@@ -79,7 +206,20 @@ async function getMetricsData() {
         rawEvent: true,
       },
     }),
+    prisma.inferenceEvent.findMany({
+      where: providerQueryWhere,
+      distinct: ['provider'],
+      select: { provider: true },
+    }),
+    prisma.inferenceEvent.findMany({
+      where: modelQueryWhere,
+      distinct: ['model'],
+      select: { model: true },
+    }),
   ]);
+
+  const availableProviders = providersList.map((p) => p.provider);
+  const availableModels = modelsList.map((m) => m.model);
 
   const runs = deriveRuns(events);
   const recentRuns = runs.filter((run) => run.lastEventAt >= lastHour);
@@ -209,7 +349,7 @@ async function getMetricsData() {
       },
     },
     series: {
-      perMinute: buildTimeSeries(lastHour, now, 60, runs),
+      perRange: buildTimeSeries(startDate, now, bucketCount, runs),
       perHour: buildTimeSeries(lastDay, now, 24, runs),
     },
     byProvider,
@@ -217,10 +357,18 @@ async function getMetricsData() {
     recentRuns: recentRuns
       .sort((a, b) => b.lastEventAt.getTime() - a.lastEventAt.getTime())
       .slice(0, 25),
+    availableProviders,
+    availableModels,
   };
 }
 
 export const GET = withLogging(async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const range = searchParams.get("range") || "24h";
+  const provider = searchParams.get("provider") || "all";
+  const model = searchParams.get("model") || "all";
+  const status = searchParams.get("status") || "all";
+
   const encoder = new TextEncoder();
   const customReadable = new ReadableStream({
     async start(controller) {
@@ -229,7 +377,7 @@ export const GET = withLogging(async function GET(request: Request) {
       const sendMetrics = async () => {
         if (isClosed) return;
         try {
-          const data = await getMetricsData();
+          const data = await getMetricsData(range, provider, model, status);
           if (isClosed) return;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
         } catch (error) {
