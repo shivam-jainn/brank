@@ -1,6 +1,8 @@
 import { getPrismaClient } from "@/lib/db";
 import { getIngestionService } from "@/lib/ingestion-service";
 import { withLogging } from "@/lib/logger";
+import { auth } from "@/lib/auth";
+import { getChatMessagesByConversation } from "@/lib/chat-storage";
 
 function getRangeConfig(range: string) {
   const now = new Date();
@@ -55,7 +57,8 @@ export async function getMetricsData(
   range: string = "24h",
   provider: string = "all",
   model: string = "all",
-  status: string = "all"
+  status: string = "all",
+  userId?: string
 ) {
   const prisma = getPrismaClient();
   if (!prisma) {
@@ -72,6 +75,9 @@ export async function getMetricsData(
 
   // Build prisma filter conditions
   const eventWhere: any = { emittedAt: { gte: queryStartDate } };
+  if (userId) {
+    eventWhere.userId = userId;
+  }
   if (provider && provider !== "all") {
     eventWhere.provider = provider;
   }
@@ -82,7 +88,10 @@ export async function getMetricsData(
     eventWhere.status = status;
   }
 
-  const messageWhere: any = {};
+  const messageWhere: any = { createdAt: { gte: queryStartDate } };
+  if (userId) {
+    messageWhere.conversation = { userId };
+  }
   if (provider && provider !== "all") {
     messageWhere.provider = provider;
   }
@@ -91,6 +100,9 @@ export async function getMetricsData(
   }
 
   const conversationWhere: any = {};
+  if (userId) {
+    conversationWhere.userId = userId;
+  }
   if (provider && provider !== "all") {
     conversationWhere.inferenceEvents = {
       some: { provider }
@@ -116,6 +128,9 @@ export async function getMetricsData(
   }
 
   const recentWhere: any = { emittedAt: { gte: lastHour } };
+  if (userId) {
+    recentWhere.userId = userId;
+  }
   if (provider && provider !== "all") {
     recentWhere.provider = provider;
   }
@@ -222,6 +237,48 @@ export async function getMetricsData(
   const availableModels = modelsList.map((m) => m.model);
 
   const runs = deriveRuns(events);
+
+  // Fetch chat messages for all conversations referenced by events
+  const conversationIds = Array.from(new Set(events.map(e => e.conversationId).filter(Boolean))) as string[];
+  const chatMessagesByConversation = new Map<string, any[]>();
+  if (conversationIds.length > 0) {
+    const allMessages = await prisma.chatMessage.findMany({
+      where: { conversationId: { in: conversationIds } },
+      orderBy: { sequence: "asc" },
+      select: {
+        id: true,
+        conversationId: true,
+        role: true,
+        content: true,
+        sequence: true,
+        createdAt: true,
+      },
+    });
+    for (const msg of allMessages) {
+      const convId = msg.conversationId;
+      if (!chatMessagesByConversation.has(convId)) {
+        chatMessagesByConversation.set(convId, []);
+      }
+      chatMessagesByConversation.get(convId)!.push(msg);
+    }
+  }
+
+  const chatSpans = deriveChatSpans(events, chatMessagesByConversation);
+
+  let totalPiiRedactions = 0;
+  let redactedRuns = 0;
+  const piiBreakdown: Record<string, number> = {};
+  for (const run of runs) {
+    const { count, breakdown } = parsePreviewRedaction(run.previews);
+    totalPiiRedactions += count;
+    if (count > 0) redactedRuns += 1;
+    if (breakdown) {
+      for (const [cat, n] of Object.entries(breakdown)) {
+        piiBreakdown[cat] = (piiBreakdown[cat] ?? 0) + n;
+      }
+    }
+  }
+
   const recentRuns = runs.filter((run) => run.lastEventAt >= lastHour);
   const completedRuns = runs.filter((run) => run.status === "completed");
   const failedRuns = runs.filter((run) => run.status === "failed");
@@ -359,6 +416,13 @@ export async function getMetricsData(
       .slice(0, 25),
     availableProviders,
     availableModels,
+    chatSpans,
+    pii: {
+      totalRedactions: totalPiiRedactions,
+      redactedRuns,
+      redactionRate: runs.length ? redactedRuns / runs.length : 0,
+      breakdown: Object.keys(piiBreakdown).length > 0 ? piiBreakdown : undefined,
+    },
   };
 }
 
@@ -368,6 +432,10 @@ export const GET = withLogging(async function GET(request: Request) {
   const provider = searchParams.get("provider") || "all";
   const model = searchParams.get("model") || "all";
   const status = searchParams.get("status") || "all";
+  const session = auth.api?.getSession
+    ? await auth.api.getSession({ headers: request.headers }).catch(() => null)
+    : null;
+  const userId = session?.user?.id;
 
   const encoder = new TextEncoder();
   const customReadable = new ReadableStream({
@@ -377,7 +445,7 @@ export const GET = withLogging(async function GET(request: Request) {
       const sendMetrics = async () => {
         if (isClosed) return;
         try {
-          const data = await getMetricsData(range, provider, model, status);
+          const data = await getMetricsData(range, provider, model, status, userId);
           if (isClosed) return;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
         } catch (error) {
@@ -447,6 +515,7 @@ type InferenceRun = {
   previews?: any;
   eventCount: number;
   error?: unknown;
+  events?: MetricEvent[];
 };
 
 function deriveRuns(events: MetricEvent[]): InferenceRun[] {
@@ -494,6 +563,96 @@ function deriveRuns(events: MetricEvent[]): InferenceRun[] {
   }
 
   return Array.from(runs.values());
+}
+
+type ChatSpan = {
+  conversationId: string;
+  startedAt: Date;
+  lastEventAt: Date;
+  requests: InferenceRun[];
+  chatMessages: Array<{ id: string; role: string; content: string; sequence: number; createdAt: Date }>;
+};
+
+function deriveChatSpans(events: MetricEvent[], chatMessagesByConversation: Map<string, any[]>): ChatSpan[] {
+  const spans = new Map<string, ChatSpan>();
+
+  for (const event of events) {
+    const convId = event.conversationId ?? "unknown";
+    let span = spans.get(convId);
+
+    if (!span) {
+      span = {
+        conversationId: convId,
+        startedAt: event.startedAt,
+        lastEventAt: event.emittedAt,
+        requests: [],
+        chatMessages: chatMessagesByConversation.get(convId) ?? [],
+      };
+      spans.set(convId, span);
+    }
+
+    span.startedAt = event.startedAt < span.startedAt ? event.startedAt : span.startedAt;
+    span.lastEventAt = event.emittedAt > span.lastEventAt ? event.emittedAt : span.lastEventAt;
+  }
+
+  // Derive request groups within each span
+  const statusRank: Record<string, number> = {
+    started: 0, completed: 1, cancelled: 2, failed: 3,
+  };
+
+  for (const span of spans.values()) {
+    const spanEvents = events.filter(e => (e.conversationId ?? "unknown") === span.conversationId);
+    const requestRuns = new Map<string, InferenceRun>();
+
+    for (const event of spanEvents) {
+      const reqId = event.requestId ?? event.traceId ?? `${event.provider}:${event.model}:${event.startedAt.toISOString()}`;
+      let run = requestRuns.get(reqId);
+
+      if (!run) {
+        run = {
+          id: reqId,
+          provider: event.provider,
+          model: event.model,
+          conversationId: event.conversationId,
+          status: "started",
+          startedAt: event.startedAt,
+          lastEventAt: event.emittedAt,
+          latencyMs: null,
+          inputTokens: null,
+          outputTokens: null,
+          totalTokens: null,
+          usageEstimated: false,
+          eventCount: 0,
+          events: [],
+        };
+        requestRuns.set(reqId, run);
+      }
+
+      run.eventCount += 1;
+      run.events!.push(event);
+      run.startedAt = event.startedAt < run.startedAt ? event.startedAt : run.startedAt;
+      run.lastEventAt = event.emittedAt > run.lastEventAt ? event.emittedAt : run.lastEventAt;
+      run.status = (statusRank[event.status] ?? 0) > (statusRank[run.status] ?? 0) ? event.status : run.status;
+      run.latencyMs = event.latencyMs ?? run.latencyMs;
+      run.inputTokens = event.inputTokens ?? run.inputTokens;
+      run.outputTokens = event.outputTokens ?? run.outputTokens;
+      run.totalTokens = event.totalTokens ?? run.totalTokens;
+      run.usageEstimated = usageIsEstimated(event.rawEvent) || run.usageEstimated;
+      run.previews = event.previews ?? run.previews;
+      run.error = event.error ?? run.error;
+    }
+
+    span.requests = Array.from(requestRuns.values()).map(run => ({
+      ...run,
+      events: run.events!.sort((a, b) => a.emittedAt.getTime() - b.emittedAt.getTime()),
+    })).sort(
+      (a, b) => a.startedAt.getTime() - b.startedAt.getTime()
+    );
+  }
+
+  return Array.from(spans.values()).sort(
+    (a, b) => b.lastEventAt.getTime() - a.lastEventAt.getTime()
+  );
 }
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -564,4 +723,16 @@ function percentile(values: number[], target: number) {
   if (values.length === 0) return 0;
   const index = Math.ceil(values.length * target) - 1;
   return values[Math.min(values.length - 1, Math.max(0, index))];
+}
+
+function parsePreviewRedaction(preview: any): { count: number; breakdown?: Record<string, number> } {
+  if (!preview) return { count: 0 };
+  let p = preview;
+  if (typeof p === "string") {
+    try { p = JSON.parse(p); } catch { return { count: 0 }; }
+  }
+  return {
+    count: typeof p?.redactionCount === "number" ? p.redactionCount : 0,
+    breakdown: p?.redactionBreakdown,
+  };
 }
