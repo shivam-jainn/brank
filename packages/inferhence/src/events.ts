@@ -30,6 +30,7 @@ export function normalizeMetadata(metadata: InferenceMetadata): InferenceMetadat
     operation: metadata.operation?.trim(),
     conversationId: metadata.conversationId,
     sessionId: metadata.sessionId,
+    userId: metadata.userId,
     traceId: metadata.traceId,
     requestId: metadata.requestId,
     attributes: metadata.attributes ?? {},
@@ -68,6 +69,7 @@ export function buildEvent(
     ids: {
       conversationId: metadata.conversationId,
       sessionId: metadata.sessionId,
+      userId: metadata.userId,
       traceId: metadata.traceId,
       requestId: metadata.requestId,
     },

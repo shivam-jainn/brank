@@ -21,6 +21,7 @@ export type TokenUsage = {
 export type InferenceIds = {
   conversationId?: string;
   sessionId?: string;
+  userId?: string;
   traceId?: string;
   requestId?: string;
 };
@@ -37,6 +38,7 @@ export type RedactedPreview = {
   output?: string;
   disabled: boolean;
   redactionCount: number;
+  redactionBreakdown?: Record<string, number>;
   truncated: boolean;
 };
 
