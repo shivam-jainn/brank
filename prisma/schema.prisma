@@ -10,6 +10,7 @@ datasource db {
 model Conversation {
   id        String   @id @default(uuid())
   sessionId String?
+  userId    String?
   title     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -19,6 +20,7 @@ model Conversation {
   metadata        ExtractedMetadata[]
 
   @@index([sessionId, updatedAt])
+  @@index([userId, updatedAt])
   @@index([createdAt])
 }
 
@@ -49,6 +51,7 @@ model InferenceEvent {
   id             String          @id
   conversationId String?
   sessionId      String?
+  userId         String?
   traceId        String?
   requestId      String?
   eventType      InferenceEventType
@@ -83,6 +86,7 @@ model InferenceEvent {
   @@index([provider, model, emittedAt])
   @@index([eventType, emittedAt])
   @@index([status, emittedAt])
+  @@index([userId, emittedAt])
 }
 
 model ExtractedMetadata {

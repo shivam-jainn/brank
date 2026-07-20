@@ -48,6 +48,7 @@ export type InferenceEventMinAggregateOutputType = {
   id: string | null
   conversationId: string | null
   sessionId: string | null
+  userId: string | null
   traceId: string | null
   requestId: string | null
   eventType: $Enums.InferenceEventType | null
@@ -74,6 +75,7 @@ export type InferenceEventMaxAggregateOutputType = {
   id: string | null
   conversationId: string | null
   sessionId: string | null
+  userId: string | null
   traceId: string | null
   requestId: string | null
   eventType: $Enums.InferenceEventType | null
@@ -100,6 +102,7 @@ export type InferenceEventCountAggregateOutputType = {
   id: number
   conversationId: number
   sessionId: number
+  userId: number
   traceId: number
   requestId: number
   eventType: number
@@ -150,6 +153,7 @@ export type InferenceEventMinAggregateInputType = {
   id?: true
   conversationId?: true
   sessionId?: true
+  userId?: true
   traceId?: true
   requestId?: true
   eventType?: true
@@ -176,6 +180,7 @@ export type InferenceEventMaxAggregateInputType = {
   id?: true
   conversationId?: true
   sessionId?: true
+  userId?: true
   traceId?: true
   requestId?: true
   eventType?: true
@@ -202,6 +207,7 @@ export type InferenceEventCountAggregateInputType = {
   id?: true
   conversationId?: true
   sessionId?: true
+  userId?: true
   traceId?: true
   requestId?: true
   eventType?: true
@@ -319,6 +325,7 @@ export type InferenceEventGroupByOutputType = {
   id: string
   conversationId: string | null
   sessionId: string | null
+  userId: string | null
   traceId: string | null
   requestId: string | null
   eventType: $Enums.InferenceEventType
@@ -372,6 +379,7 @@ export type InferenceEventWhereInput = {
   id?: Prisma.StringFilter<"InferenceEvent"> | string
   conversationId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   sessionId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
+  userId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   traceId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   requestId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   eventType?: Prisma.EnumInferenceEventTypeFilter<"InferenceEvent"> | $Enums.InferenceEventType
@@ -404,6 +412,7 @@ export type InferenceEventOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   conversationId?: Prisma.SortOrderInput | Prisma.SortOrder
   sessionId?: Prisma.SortOrderInput | Prisma.SortOrder
+  userId?: Prisma.SortOrderInput | Prisma.SortOrder
   traceId?: Prisma.SortOrderInput | Prisma.SortOrder
   requestId?: Prisma.SortOrderInput | Prisma.SortOrder
   eventType?: Prisma.SortOrder
@@ -439,6 +448,7 @@ export type InferenceEventWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.InferenceEventWhereInput | Prisma.InferenceEventWhereInput[]
   conversationId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   sessionId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
+  userId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   traceId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   requestId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   eventType?: Prisma.EnumInferenceEventTypeFilter<"InferenceEvent"> | $Enums.InferenceEventType
@@ -471,6 +481,7 @@ export type InferenceEventOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   conversationId?: Prisma.SortOrderInput | Prisma.SortOrder
   sessionId?: Prisma.SortOrderInput | Prisma.SortOrder
+  userId?: Prisma.SortOrderInput | Prisma.SortOrder
   traceId?: Prisma.SortOrderInput | Prisma.SortOrder
   requestId?: Prisma.SortOrderInput | Prisma.SortOrder
   eventType?: Prisma.SortOrder
@@ -509,6 +520,7 @@ export type InferenceEventScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"InferenceEvent"> | string
   conversationId?: Prisma.StringNullableWithAggregatesFilter<"InferenceEvent"> | string | null
   sessionId?: Prisma.StringNullableWithAggregatesFilter<"InferenceEvent"> | string | null
+  userId?: Prisma.StringNullableWithAggregatesFilter<"InferenceEvent"> | string | null
   traceId?: Prisma.StringNullableWithAggregatesFilter<"InferenceEvent"> | string | null
   requestId?: Prisma.StringNullableWithAggregatesFilter<"InferenceEvent"> | string | null
   eventType?: Prisma.EnumInferenceEventTypeWithAggregatesFilter<"InferenceEvent"> | $Enums.InferenceEventType
@@ -538,6 +550,7 @@ export type InferenceEventScalarWhereWithAggregatesInput = {
 export type InferenceEventCreateInput = {
   id: string
   sessionId?: string | null
+  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -570,6 +583,7 @@ export type InferenceEventUncheckedCreateInput = {
   id: string
   conversationId?: string | null
   sessionId?: string | null
+  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -600,6 +614,7 @@ export type InferenceEventUncheckedCreateInput = {
 export type InferenceEventUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -632,6 +647,7 @@ export type InferenceEventUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   conversationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -663,6 +679,7 @@ export type InferenceEventCreateManyInput = {
   id: string
   conversationId?: string | null
   sessionId?: string | null
+  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -692,6 +709,7 @@ export type InferenceEventCreateManyInput = {
 export type InferenceEventUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -722,6 +740,7 @@ export type InferenceEventUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   conversationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -762,6 +781,7 @@ export type InferenceEventCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   sessionId?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   traceId?: Prisma.SortOrder
   requestId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
@@ -801,6 +821,7 @@ export type InferenceEventMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   sessionId?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   traceId?: Prisma.SortOrder
   requestId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
@@ -827,6 +848,7 @@ export type InferenceEventMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   conversationId?: Prisma.SortOrder
   sessionId?: Prisma.SortOrder
+  userId?: Prisma.SortOrder
   traceId?: Prisma.SortOrder
   requestId?: Prisma.SortOrder
   eventType?: Prisma.SortOrder
@@ -944,6 +966,7 @@ export type InferenceEventUpdateOneWithoutExtractedMetadataNestedInput = {
 export type InferenceEventCreateWithoutConversationInput = {
   id: string
   sessionId?: string | null
+  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -974,6 +997,7 @@ export type InferenceEventCreateWithoutConversationInput = {
 export type InferenceEventUncheckedCreateWithoutConversationInput = {
   id: string
   sessionId?: string | null
+  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -1034,6 +1058,7 @@ export type InferenceEventScalarWhereInput = {
   id?: Prisma.StringFilter<"InferenceEvent"> | string
   conversationId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   sessionId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
+  userId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   traceId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   requestId?: Prisma.StringNullableFilter<"InferenceEvent"> | string | null
   eventType?: Prisma.EnumInferenceEventTypeFilter<"InferenceEvent"> | $Enums.InferenceEventType
@@ -1063,6 +1088,7 @@ export type InferenceEventScalarWhereInput = {
 export type InferenceEventCreateWithoutExtractedMetadataInput = {
   id: string
   sessionId?: string | null
+  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -1094,6 +1120,7 @@ export type InferenceEventUncheckedCreateWithoutExtractedMetadataInput = {
   id: string
   conversationId?: string | null
   sessionId?: string | null
+  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -1139,6 +1166,7 @@ export type InferenceEventUpdateToOneWithWhereWithoutExtractedMetadataInput = {
 export type InferenceEventUpdateWithoutExtractedMetadataInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -1170,6 +1198,7 @@ export type InferenceEventUncheckedUpdateWithoutExtractedMetadataInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   conversationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -1199,6 +1228,7 @@ export type InferenceEventUncheckedUpdateWithoutExtractedMetadataInput = {
 export type InferenceEventCreateManyConversationInput = {
   id: string
   sessionId?: string | null
+  userId?: string | null
   traceId?: string | null
   requestId?: string | null
   eventType: $Enums.InferenceEventType
@@ -1228,6 +1258,7 @@ export type InferenceEventCreateManyConversationInput = {
 export type InferenceEventUpdateWithoutConversationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -1258,6 +1289,7 @@ export type InferenceEventUpdateWithoutConversationInput = {
 export type InferenceEventUncheckedUpdateWithoutConversationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -1288,6 +1320,7 @@ export type InferenceEventUncheckedUpdateWithoutConversationInput = {
 export type InferenceEventUncheckedUpdateManyWithoutConversationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   traceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   requestId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   eventType?: Prisma.EnumInferenceEventTypeFieldUpdateOperationsInput | $Enums.InferenceEventType
@@ -1349,6 +1382,7 @@ export type InferenceEventSelect<ExtArgs extends runtime.Types.Extensions.Intern
   id?: boolean
   conversationId?: boolean
   sessionId?: boolean
+  userId?: boolean
   traceId?: boolean
   requestId?: boolean
   eventType?: boolean
@@ -1382,6 +1416,7 @@ export type InferenceEventSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   id?: boolean
   conversationId?: boolean
   sessionId?: boolean
+  userId?: boolean
   traceId?: boolean
   requestId?: boolean
   eventType?: boolean
@@ -1413,6 +1448,7 @@ export type InferenceEventSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   id?: boolean
   conversationId?: boolean
   sessionId?: boolean
+  userId?: boolean
   traceId?: boolean
   requestId?: boolean
   eventType?: boolean
@@ -1444,6 +1480,7 @@ export type InferenceEventSelectScalar = {
   id?: boolean
   conversationId?: boolean
   sessionId?: boolean
+  userId?: boolean
   traceId?: boolean
   requestId?: boolean
   eventType?: boolean
@@ -1470,7 +1507,7 @@ export type InferenceEventSelectScalar = {
   attempts?: boolean
 }
 
-export type InferenceEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "conversationId" | "sessionId" | "traceId" | "requestId" | "eventType" | "status" | "sequence" | "provider" | "model" | "operation" | "startedAt" | "emittedAt" | "completedAt" | "latencyMs" | "inputTokens" | "outputTokens" | "totalTokens" | "metadata" | "previews" | "error" | "rawEvent" | "receivedAt" | "queuedAt" | "processingStartedAt" | "persistedAt" | "attempts", ExtArgs["result"]["inferenceEvent"]>
+export type InferenceEventOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "conversationId" | "sessionId" | "userId" | "traceId" | "requestId" | "eventType" | "status" | "sequence" | "provider" | "model" | "operation" | "startedAt" | "emittedAt" | "completedAt" | "latencyMs" | "inputTokens" | "outputTokens" | "totalTokens" | "metadata" | "previews" | "error" | "rawEvent" | "receivedAt" | "queuedAt" | "processingStartedAt" | "persistedAt" | "attempts", ExtArgs["result"]["inferenceEvent"]>
 export type InferenceEventInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   conversation?: boolean | Prisma.InferenceEvent$conversationArgs<ExtArgs>
   extractedMetadata?: boolean | Prisma.InferenceEvent$extractedMetadataArgs<ExtArgs>
@@ -1493,6 +1530,7 @@ export type $InferenceEventPayload<ExtArgs extends runtime.Types.Extensions.Inte
     id: string
     conversationId: string | null
     sessionId: string | null
+    userId: string | null
     traceId: string | null
     requestId: string | null
     eventType: $Enums.InferenceEventType
@@ -1945,6 +1983,7 @@ export interface InferenceEventFieldRefs {
   readonly id: Prisma.FieldRef<"InferenceEvent", 'String'>
   readonly conversationId: Prisma.FieldRef<"InferenceEvent", 'String'>
   readonly sessionId: Prisma.FieldRef<"InferenceEvent", 'String'>
+  readonly userId: Prisma.FieldRef<"InferenceEvent", 'String'>
   readonly traceId: Prisma.FieldRef<"InferenceEvent", 'String'>
   readonly requestId: Prisma.FieldRef<"InferenceEvent", 'String'>
   readonly eventType: Prisma.FieldRef<"InferenceEvent", 'InferenceEventType'>

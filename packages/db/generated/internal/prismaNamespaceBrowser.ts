@@ -80,6 +80,7 @@ export type TransactionIsolationLevel = (typeof TransactionIsolationLevel)[keyof
 export const ConversationScalarFieldEnum = {
   id: 'id',
   sessionId: 'sessionId',
+  userId: 'userId',
   title: 'title',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -110,6 +111,7 @@ export const InferenceEventScalarFieldEnum = {
   id: 'id',
   conversationId: 'conversationId',
   sessionId: 'sessionId',
+  userId: 'userId',
   traceId: 'traceId',
   requestId: 'requestId',
   eventType: 'eventType',
