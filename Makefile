@@ -105,6 +105,22 @@ HELM_TIMEOUT     ?= 180s
 
 -include .env.local
 
+# Dynamically gather active secrets from local .env/.env.local and shell environment.
+# Only passes non-empty secrets to Helm.
+HELM_SECRETS_ARGS := $(shell \
+	( [ -f .env ] && grep -v '^\#' .env || true; \
+	  [ -f .env.local ] && grep -v '^\#' .env.local || true; \
+	  env ) | \
+	grep -E '^(OPENAI_API_KEY|GROQ_API_KEY|BETTER_AUTH_SECRET|BETTER_AUTH_URL|GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET|GITHUB_CLIENT_ID|GITHUB_CLIENT_SECRET|ANTHROPIC_API_KEY|GOOGLE_API_KEY|GEMINI_API_KEY)=' | \
+	while read -r line || [ -n "$$line" ]; do \
+		key=$$(echo "$$line" | cut -d= -f1); \
+		val=$$(echo "$$line" | cut -d= -f2- | tr -d '"' | tr -d "'"); \
+		if [ -n "$$val" ]; then \
+			printf "%s " "--set secrets.$$key=$$val"; \
+		fi; \
+	done \
+)
+
 .PHONY: deploy destroy
 
 deploy:
@@ -147,8 +163,8 @@ _k8s-cluster-create:
 			kind create cluster --name "$(K8S_CLUSTER_NAME)"; \
 			echo "==> Installing nginx ingress controller"; \
 			kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml; \
-			kubectl wait --namespace ingress-nginx --for=condition=ready pod \
-				--selector=app.kubernetes.io/component=controller --timeout=120s; \
+			kubectl wait --namespace ingress-nginx --for=condition=available \
+				deployment/ingress-nginx-controller --timeout=120s; \
 		else \
 			echo "kind cluster '$(K8S_CLUSTER_NAME)' already exists"; \
 		fi; \
@@ -158,8 +174,8 @@ _k8s-cluster-create:
 			k3d cluster create "$(K8S_CLUSTER_NAME)" --k3s-arg '--disable=traefik@server:*'; \
 			echo "==> Installing nginx ingress controller"; \
 			kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml; \
-			kubectl wait --namespace ingress-nginx --for=condition=ready pod \
-				--selector=app.kubernetes.io/component=controller --timeout=120s; \
+			kubectl wait --namespace ingress-nginx --for=condition=available \
+				deployment/ingress-nginx-controller --timeout=120s; \
 		else \
 			echo "k3d cluster '$(K8S_CLUSTER_NAME)' already exists"; \
 		fi; \
@@ -175,20 +191,19 @@ _k8s-cluster-delete:
 	fi
 
 _k8s-build:
-	@echo "==> Building images in parallel"
-	@docker build -t brank:$(K8S_BUILD_TAG) . &
-	@docker build -t brank-worker:$(K8S_BUILD_TAG) -f Dockerfile.worker . &
-	@wait
+	@echo "==> Building images"
+	docker build -t brank:$(K8S_BUILD_TAG) --target app .
+	docker build -t brank-worker:$(K8S_BUILD_TAG) --target worker .
 
 _k8s-load: _k8s-build
 	@if command -v kind >/dev/null && kind get clusters 2>/dev/null | grep -qx "$(K8S_CLUSTER_NAME)"; then \
-		kind load docker-image brank:$(K8S_BUILD_TAG) --name "$(K8S_CLUSTER_NAME)" & \
-		kind load docker-image brank-worker:$(K8S_BUILD_TAG) --name "$(K8S_CLUSTER_NAME)" & \
-		wait; \
+		echo "==> Loading images into kind cluster"; \
+		kind load docker-image brank:$(K8S_BUILD_TAG) --name "$(K8S_CLUSTER_NAME)"; \
+		kind load docker-image brank-worker:$(K8S_BUILD_TAG) --name "$(K8S_CLUSTER_NAME)"; \
 	elif command -v k3d >/dev/null && k3d cluster list 2>/dev/null | grep -qw "$(K8S_CLUSTER_NAME)"; then \
-		k3d image import brank:$(K8S_BUILD_TAG) --cluster "$(K8S_CLUSTER_NAME)" & \
-		k3d image import brank-worker:$(K8S_BUILD_TAG) --cluster "$(K8S_CLUSTER_NAME)" & \
-		wait; \
+		echo "==> Loading images into k3d cluster"; \
+		k3d image import brank:$(K8S_BUILD_TAG) --cluster "$(K8S_CLUSTER_NAME)"; \
+		k3d image import brank-worker:$(K8S_BUILD_TAG) --cluster "$(K8S_CLUSTER_NAME)"; \
 	else \
 		echo "No cluster '$(K8S_CLUSTER_NAME)'. Run 'make deploy' first."; exit 1; \
 	fi
@@ -199,11 +214,7 @@ _helm-upgrade:
 		--set image.tag=$(K8S_BUILD_TAG) \
 		--set workerImage.tag=$(K8S_BUILD_TAG) \
 		--set app.replicas=1 \
-		--set secrets.OPENAI_API_KEY="$(or $(OPENAI_API_KEY),sk-placeholder)" \
-		--set secrets.BETTER_AUTH_SECRET="$(or $(BETTER_AUTH_SECRET),$(shell openssl rand -base64 32))" \
-		--set "secrets.DATABASE_URL=postgresql://brank:brank@$(HELM_RELEASE)-postgres:5432/brank" \
-		--set "secrets.RABBITMQ_URL=amqp://brank:brank@$(HELM_RELEASE)-rabbitmq:5672" \
-		--set "secrets.REDIS_URL=redis://$(HELM_RELEASE)-redis:6379" \
+		$(HELM_SECRETS_ARGS) \
 		--wait --timeout $(HELM_TIMEOUT)
 
 _helm-uninstall:

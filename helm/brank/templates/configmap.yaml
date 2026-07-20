@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "brank.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "brank.labels" . | nindent 4 }}
+data:
+  RABBITMQ_QUEUE: {{ .Values.ingestion.queue | quote }}
+  RABBITMQ_DLQ: {{ .Values.ingestion.dlq | quote }}
+  RABBITMQ_PREFETCH: {{ .Values.ingestion.prefetch | quote }}
+  INGESTION_MAX_BATCH_SIZE: {{ .Values.ingestion.maxBatchSize | quote }}
+  INGESTION_MAX_BATCH_WAIT_MS: {{ .Values.ingestion.maxBatchWaitMs | quote }}
+  INGESTION_MAX_RETRIES: {{ .Values.ingestion.maxRetries | quote }}

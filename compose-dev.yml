@@ -48,7 +48,10 @@ services:
       retries: 20
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
     profiles: ["app"]
     env_file:
       - path: .env
@@ -73,7 +76,8 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile.worker
+      dockerfile: Dockerfile
+      target: worker
     profiles: ["workers"]
     env_file:
       - path: .env

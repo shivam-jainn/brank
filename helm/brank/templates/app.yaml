@@ -34,13 +34,9 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ include "brank.secretName" . }}
+            - configMapRef:
+                name: {{ include "brank.fullname" . }}-config
           env:
-            - name: DATABASE_URL
-              value: {{ .Values.secrets.DATABASE_URL | quote }}
-            - name: RABBITMQ_URL
-              value: {{ .Values.secrets.RABBITMQ_URL | quote }}
-            - name: REDIS_URL
-              value: {{ .Values.secrets.REDIS_URL | quote }}
             - name: INFERHENCE_INGEST_URL
               value: http://{{ include "brank.fullname" . }}-app:3000/api/ingest
             - name: NODE_ENV

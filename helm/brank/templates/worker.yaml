@@ -32,28 +32,8 @@ spec:
           envFrom:
             - secretRef:
                 name: {{ include "brank.secretName" . }}
-          env:
-            - name: DATABASE_URL
-              value: {{ .Values.secrets.DATABASE_URL | quote }}
-            - name: RABBITMQ_URL
-              value: {{ .Values.secrets.RABBITMQ_URL | quote }}
-            - name: RABBITMQ_QUEUE
-              value: {{ .Values.ingestion.queue | quote }}
-            - name: RABBITMQ_DLQ
-              value: {{ .Values.ingestion.dlq | quote }}
-            - name: RABBITMQ_PREFETCH
-              value: {{ .Values.ingestion.prefetch | quote }}
-            - name: INGESTION_MAX_BATCH_SIZE
-              value: {{ .Values.ingestion.maxBatchSize | quote }}
-            - name: INGESTION_MAX_BATCH_WAIT_MS
-              value: {{ .Values.ingestion.maxBatchWaitMs | quote }}
-            - name: INGESTION_MAX_RETRIES
-              value: {{ .Values.ingestion.maxRetries | quote }}
+            - configMapRef:
+                name: {{ include "brank.fullname" . }}-config
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
-          livenessProbe:
-            exec:
-              command: ["sh", "-c", "ps aux | grep -v grep | grep worker.ts"]
-            initialDelaySeconds: 30
-            periodSeconds: 30
-            failureThreshold: 3
+
