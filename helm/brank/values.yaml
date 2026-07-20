@@ -12,9 +12,15 @@
 # template. If you would rather manage secrets out-of-band, set
 # `existingSecret: brank-secrets` and Helm will not create one.
 
-# Container image
+# Container image (Next.js app)
 image:
   repository: brank
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Worker image — built from Dockerfile.worker, no Next.js build.
+workerImage:
+  repository: brank-worker
   tag: latest
   pullPolicy: IfNotPresent
 
