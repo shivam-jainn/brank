@@ -112,7 +112,7 @@ deploy:
 		k8s)     $(MAKE) _k8s-deploy ;; \
 		compose) $(MAKE) up ;; \
 		auto) \
-			if command -v kubectl >/dev/null && kubectl cluster-info --request-timeout=3s >/dev/null 2>&1; then \
+			if command -v kind >/dev/null || command -v k3d >/dev/null; then \
 				$(MAKE) _k8s-deploy; \
 			else \
 				$(MAKE) up; \
@@ -175,16 +175,20 @@ _k8s-cluster-delete:
 	fi
 
 _k8s-build:
-	docker build -t brank:$(K8S_BUILD_TAG) .
-	docker build -t brank-worker:$(K8S_BUILD_TAG) -f Dockerfile.worker .
+	@echo "==> Building images in parallel"
+	@docker build -t brank:$(K8S_BUILD_TAG) . &
+	@docker build -t brank-worker:$(K8S_BUILD_TAG) -f Dockerfile.worker . &
+	@wait
 
 _k8s-load: _k8s-build
 	@if command -v kind >/dev/null && kind get clusters 2>/dev/null | grep -qx "$(K8S_CLUSTER_NAME)"; then \
-		kind load docker-image brank:$(K8S_BUILD_TAG) --name "$(K8S_CLUSTER_NAME)" && \
-		kind load docker-image brank-worker:$(K8S_BUILD_TAG) --name "$(K8S_CLUSTER_NAME)"; \
+		kind load docker-image brank:$(K8S_BUILD_TAG) --name "$(K8S_CLUSTER_NAME)" & \
+		kind load docker-image brank-worker:$(K8S_BUILD_TAG) --name "$(K8S_CLUSTER_NAME)" & \
+		wait; \
 	elif command -v k3d >/dev/null && k3d cluster list 2>/dev/null | grep -qw "$(K8S_CLUSTER_NAME)"; then \
-		k3d image import brank:$(K8S_BUILD_TAG) --cluster "$(K8S_CLUSTER_NAME)" && \
-		k3d image import brank-worker:$(K8S_BUILD_TAG) --cluster "$(K8S_CLUSTER_NAME)"; \
+		k3d image import brank:$(K8S_BUILD_TAG) --cluster "$(K8S_CLUSTER_NAME)" & \
+		k3d image import brank-worker:$(K8S_BUILD_TAG) --cluster "$(K8S_CLUSTER_NAME)" & \
+		wait; \
 	else \
 		echo "No cluster '$(K8S_CLUSTER_NAME)'. Run 'make deploy' first."; exit 1; \
 	fi

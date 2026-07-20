@@ -1,6 +1,7 @@
 FROM oven/bun:1.2 AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
+COPY prisma ./prisma
 COPY packages/db/package.json packages/db/package.json
 COPY packages/inferhence/package.json packages/inferhence/package.json
 COPY packages/ingestion/package.json packages/ingestion/package.json
