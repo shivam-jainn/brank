@@ -36,11 +36,8 @@ spec:
       terminationGracePeriodSeconds: 60   # give the worker time to drain
       containers:
         - name: worker
-          image: brank:latest
+          image: brank-worker:latest
           imagePullPolicy: IfNotPresent
-          command:
-            - bun
-            - packages/ingestion/src/worker.ts
           envFrom:
             - secretRef:
                 name: brank-secrets

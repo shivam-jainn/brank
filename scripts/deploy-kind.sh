@@ -4,7 +4,8 @@
 # deploy the entire Brank stack with one command. Useful for demoing the
 # "Deploy on self-hosted k8s" bonus locally without a cloud bill.
 #
-# Prerequisites: docker, kind, kubectl, helm, and the built `brank:latest` image.
+# Prerequisites: docker, kind, kubectl, helm. Builds the `brank:latest` app
+# image and the `brank-worker:latest` worker image automatically.
 #
 # Usage:
 #   OPENAI_API_KEY=sk-... ./scripts/deploy-kind.sh
@@ -26,9 +27,11 @@ if ! kind get clusters | grep -qx "$CLUSTER_NAME"; then
   kind create cluster --name "$CLUSTER_NAME"
 fi
 
-echo "==> Loading local image into kind"
+echo "==> Loading local images into kind"
 docker build -t brank:latest . >/dev/null
+docker build -f Dockerfile.worker -t brank-worker:latest . >/dev/null
 kind load docker-image brank:latest --name "$CLUSTER_NAME"
+kind load docker-image brank-worker:latest --name "$CLUSTER_NAME"
 
 echo "==> Installing nginx ingress controller"
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml >/dev/null
