@@ -132,7 +132,8 @@ describe("AppSidebar state callbacks", () => {
       onOpenSettings,
     });
 
-    const dropdownMenu = element.props.children[4];
+    const wrapperDiv = element.props.children[4];
+    const dropdownMenu = wrapperDiv.props.children;
     const dropdownContent = dropdownMenu.props.children[1];
     const settingsItem = dropdownContent.props.children[0];
     settingsItem.props.onClick();
@@ -148,7 +149,8 @@ describe("AppSidebar state callbacks", () => {
       setSidebarOpen: () => {},
     });
 
-    const dropdownMenu = element.props.children[4];
+    const wrapperDiv = element.props.children[4];
+    const dropdownMenu = wrapperDiv.props.children;
     const dropdownContent = dropdownMenu.props.children[1];
     const settingsItem = dropdownContent.props.children[0];
     settingsItem.props.onClick();

@@ -181,7 +181,7 @@ export function AppSidebar({
           </motion.div>
         </AnimatePresence>
       </button>
-      
+
       {!isDashboard && (
         <Link
           className="mt-1 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm transition-colors hover:bg-white/10 text-[#ececec]"
@@ -223,48 +223,50 @@ export function AppSidebar({
           </motion.div>
         )}
       </AnimatePresence>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <button
-              className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-white/10 data-[popup-open]:bg-white/10"
-              type="button"
+      <div className="mt-auto w-full">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                className="mt-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-white/10 data-[popup-open]:bg-white/10"
+                type="button"
+              >
+                <span className="relative flex size-8 items-center justify-center rounded-full bg-[#252525] ring-1 ring-white/10">
+                  <Image alt="" height={18} src="/olive-mark.svg" width={18} />
+                  <span className="absolute right-0 bottom-0 size-2 rounded-full border-2 border-[#171717] bg-[#74a742]" />
+                </span>
+                <span className="min-w-0 flex-1 text-[#ececec]">
+                  <span className="block font-medium">Olive AI</span>
+                  <span className="block text-xs text-[#8b8b8b]">Local inference</span>
+                </span>
+                <ChevronDownIcon className="size-4 text-[#8b8b8b]" />
+              </button>
+            }
+          />
+          <DropdownMenuContent
+            align="start"
+            className="sidebar-dropdown-content w-[236px] rounded-xl border border-white/10 bg-[#2b2b2b]/95 p-1 text-[#ececec] shadow-2xl before:hidden"
+            side="top"
+            sideOffset={8}
+          >
+            <DropdownMenuItem
+              className="min-h-10 rounded-lg px-3"
+              onClick={openGeneralSettings}
             >
-              <span className="relative flex size-8 items-center justify-center rounded-full bg-[#252525] ring-1 ring-white/10">
-                <Image alt="" height={18} src="/olive-mark.svg" width={18} />
-                <span className="absolute right-0 bottom-0 size-2 rounded-full border-2 border-[#171717] bg-[#74a742]" />
-              </span>
-              <span className="min-w-0 flex-1 text-[#ececec]">
-                <span className="block font-medium">Olive AI</span>
-                <span className="block text-xs text-[#8b8b8b]">Local inference</span>
-              </span>
-              <ChevronDownIcon className="size-4 text-[#8b8b8b]" />
-            </button>
-          }
-        />
-        <DropdownMenuContent
-          align="start"
-          className="w-[236px] rounded-xl border border-white/10 bg-[#2b2b2b]/95 p-1 text-[#ececec] shadow-2xl before:hidden"
-          side="top"
-          sideOffset={8}
-        >
-          <DropdownMenuItem
-            className="min-h-10 rounded-lg px-3 text-sm focus:bg-white/10"
-            onClick={openGeneralSettings}
-          >
-            <Settings2Icon className="size-4" />
-            Settings
-          </DropdownMenuItem>
-          <DropdownMenuSeparator className="bg-white/10" />
-          <DropdownMenuItem
-            className="min-h-10 rounded-lg px-3 text-sm focus:bg-white/10"
-            onClick={handleLogout}
-          >
-            <LogOutIcon className="size-4" />
-            Log out
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+              <Settings2Icon className="size-4" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuItem
+              className="min-h-10 rounded-lg px-3"
+              onClick={handleLogout}
+            >
+              <LogOutIcon className="size-4" />
+              Log out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </aside>
   );
 }

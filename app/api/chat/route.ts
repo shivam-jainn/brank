@@ -12,9 +12,34 @@ import { getInferenceTransport, usageFromAiSdk } from '@/lib/inferhence';
 import { persistChatRequest, persistChatResponse } from '@/lib/chat-storage';
 import { withReadableStreamingInference } from '@brank/inferhence';
 import { appConfig } from '@/lib/config';
+import { buildEvent, normalizeMetadata, type InferenceEventType, type TokenUsage } from '@brank/inferhence';
 
-export const POST = withLogging(async function POST(req: Request) {
-    const { messages, model }: { messages: UIMessage[], model: unknown } = await req.json();
+function emitInferenceEvent(
+    eventType: InferenceEventType,
+    args: {
+        output?: unknown;
+        usage?: TokenUsage;
+        error?: unknown;
+        completed?: boolean;
+    },
+    metadata: ReturnType<typeof normalizeMetadata>,
+) {
+    const transport = getInferenceTransport(appConfig.inference.ingestUrl ?? new URL('/api/ingest', 'http://localhost').toString());
+    void transport.send(buildEvent(
+        {
+            metadata,
+            input: undefined,
+            startedAtMs: Date.now(),
+            sequence: 0,
+            clock: () => Date.now(),
+            idFactory: () => crypto.randomUUID(),
+        },
+        eventType,
+        args,
+    ));
+}
+
+export const POST = withLogging(async function POST(req: Request) {    const { messages, model }: { messages: UIMessage[], model: unknown } = await req.json();
     const selectedProvider = String(model);
     const modelId = selectedProvider.includes(':')
         ? selectedProvider
@@ -107,15 +132,38 @@ export const POST = withLogging(async function POST(req: Request) {
         });
     });
 
+    const inferenceMetadata = normalizeMetadata({
+        provider,
+        model: modelName,
+        operation: 'chat.stream',
+        conversationId,
+        sessionId,
+        traceId,
+        requestId,
+        attributes: { route: '/api/chat' },
+    });
+
+    let streamError: unknown;
+
     const persistedResponseStream = instrumentedStream.pipeThrough(new TransformStream({
         transform(chunk, controller) {
             if (chunk.type === 'text-delta') {
                 assistantText += chunk.text;
             }
+            if (chunk.type === 'error') {
+                streamError = chunk.error;
+            }
             controller.enqueue(chunk);
         },
         async flush() {
             await saveAssistantResponse();
+            if (streamError) {
+                emitInferenceEvent(
+                    'failed',
+                    { error: streamError, completed: true },
+                    inferenceMetadata,
+                );
+            }
         },
     }));
 
