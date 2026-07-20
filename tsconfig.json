@@ -20,6 +20,8 @@
     ],
     "paths": {
       "@/*": ["./*"],
+      "@brank/db": ["./packages/db/src/index.ts"],
+      "@brank/db/client": ["./packages/db/generated/client.ts"],
       "@brank/inferhence": ["./packages/inferhence/src/index.ts"],
       "@brank/ingestion": ["./packages/ingestion/src/index.ts"],
       "@brank/providers": ["./packages/providers/registry.ts"],

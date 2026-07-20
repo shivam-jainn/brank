@@ -20,7 +20,7 @@
 import amqplib from "amqplib";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../../../app/generated/prisma/client";
+import { PrismaClient } from "@brank/db/client";
 import { createRabbitMqEventQueue } from "./rabbitmq";
 import { createPrismaEventStore } from "./prisma-store";
 import { createIngestionService } from "./service";

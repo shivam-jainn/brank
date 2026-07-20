@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Prisma, PrismaClient } from "@/app/generated/prisma/client";
+import { Prisma, PrismaClient } from "@brank/db/client";
 import { appConfig } from "@/lib/config";
 
 export { Prisma };

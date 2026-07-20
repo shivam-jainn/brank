@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "../../../app/generated/prisma/client";
+import type { Prisma, PrismaClient } from "@brank/db/client";
 import type { QueuedInferenceEvent } from "./pipeline";
 
 export function createPrismaEventStore(prisma: PrismaClient) {
