@@ -27,6 +27,7 @@
     "@base-ui/react": "^1.6.0",
     "@better-auth/prisma-adapter": "^1.6.23",
     "@brank/inferhence": "workspace:*",
+    "@brank/db": "workspace:*",
     "@brank/ingestion": "workspace:*",
     "@brank/providers": "workspace:*",
     "@next/env": "16.2.10",

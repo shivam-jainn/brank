@@ -13,6 +13,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@brank/db": "workspace:*",
     "@brank/inferhence": "workspace:*"
   }
 }
