@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:16-alpine
-    profiles: ["infra"]
     environment:
       POSTGRES_USER: brank
       POSTGRES_PASSWORD: brank
@@ -18,7 +17,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    profiles: ["infra"]
     ports:
       - "6379:6379"
     volumes:
@@ -32,7 +30,6 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
-    profiles: ["infra"]
     environment:
       RABBITMQ_DEFAULT_USER: brank
       RABBITMQ_DEFAULT_PASS: brank
@@ -49,7 +46,6 @@ services:
 
   app:
     build: .
-    profiles: ["app"]
     env_file:
       - path: .env
         required: false
@@ -71,8 +67,9 @@ services:
     command: sh -c "bun run db:migrate && bun run start"
 
   worker:
-    build: .
-    profiles: ["workers"]
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
     env_file:
       - path: .env
         required: false

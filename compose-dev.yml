@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["infra"]
+    environment:
+      POSTGRES_USER: brank
+      POSTGRES_PASSWORD: brank
+      POSTGRES_DB: brank
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brank -d brank"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["infra"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    profiles: ["infra"]
+    environment:
+      RABBITMQ_DEFAULT_USER: brank
+      RABBITMQ_DEFAULT_PASS: brank
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # management UI → http://localhost:15672
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  app:
+    build: .
+    profiles: ["app"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://brank:brank@postgres:5432/brank}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://brank:brank@rabbitmq:5672}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      INFERHENCE_INGEST_URL: ${INFERHENCE_INGEST_URL:-http://app:3000/api/ingest}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "bun run db:migrate && bun run start"
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    profiles: ["workers"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://brank:brank@postgres:5432/brank}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://brank:brank@rabbitmq:5672}
+      RABBITMQ_QUEUE: brank.inference.events
+      RABBITMQ_DLQ: brank.inference.dlq
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    command: sh -c "bun run db:migrate && bun packages/ingestion/src/worker.ts"
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
