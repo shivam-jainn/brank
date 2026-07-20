@@ -107,8 +107,9 @@ describe("AppSidebar state callbacks", () => {
       onResumeConversation,
     });
 
-    // The AnimatePresence is the 4th element (index 3)
-    const animatePresence = element.props.children[3];
+    // The wrapper div is the 4th element (index 3)
+    const wrapperDiv = element.props.children[3];
+    const animatePresence = wrapperDiv.props.children;
     const motionDiv = animatePresence.props.children;
     const buttonList = motionDiv.props.children[1].props.children;
     

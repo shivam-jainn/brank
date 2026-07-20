@@ -10,6 +10,10 @@ mock.module("@/lib/chat-storage", () => ({
   persistChatResponse: mockPersistChatResponse,
 }));
 
+mock.module("@/lib/auth", () => ({
+  auth: { api: { getSession: () => Promise.resolve(null) } },
+}));
+
 // Mock the AI SDK streamText call
 mock.module("ai", () => {
   const original = require("ai");

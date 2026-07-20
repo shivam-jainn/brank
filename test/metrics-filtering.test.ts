@@ -71,6 +71,7 @@ const mockPrisma = {
   },
   chatMessage: {
     count: mock(() => Promise.resolve(10)),
+    findMany: mock(() => Promise.resolve([])),
   },
   conversation: {
     count: mock(() => Promise.resolve(5)),
@@ -79,6 +80,14 @@ const mockPrisma = {
 
 mock.module("@/lib/db", () => ({
   getPrismaClient: () => mockPrisma,
+}));
+
+mock.module("@/lib/auth", () => ({
+  auth: {
+    api: {
+      getSession: () => Promise.resolve(null),
+    },
+  },
 }));
 
 mock.module("@/lib/ingestion-service", () => ({
