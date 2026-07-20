@@ -1,79 +1,181 @@
-# Architecture Notes
+# Architecture
 
-These notes expand on the README with the four areas called out in the submission: ingestion flow, logging strategy, scaling considerations, and failure-handling assumptions.
-
-## Ingestion Flow
+Brank is a **producer/consumer** system. The Next.js app produces inference events while it
+streams chat responses; a standalone **worker** consumes those events and writes
+append-only telemetry to Postgres. This decouples chat latency from telemetry writes: a slow
+or paused database write never delays a token reaching the user.
 
 ```
-Browser (Chat UI / Dashboard)
-        │  streamed chat response          │  SSE live metrics
-        ▼                                  ▼
-┌──────────────────────────────────────────────────────────┐
-│  Next.js App (producer)                                  │
-│   /api/chat   → calls provider via @brank/inferhence     │
-│   /api/ingest → receives SDK telemetry                   │
-│   /api/metrics → SSE dashboard feed                      │
-└───────────────────────────┬──────────────────────────────┘
-                             │  POST each event (HTTP transport)
-                             ▼
-              ┌────────────────────────────┐
-              │  /api/ingest               │
-              │   validate (zod)           │
-              │   redact previews          │
-              │   publish → EventQueue     │
-              └─────────────┬──────────────┘
-                            │  publish / consume
-                            ▼
-                 ┌─────────────────────┐
-                 │  EventQueue adapter  │   in-memory (dev) | RabbitMQ (prod) | Kafka (future)
-                 └─────────┬───────────┘
-                           │  consume (micro-batch)
-                           ▼
-                 ┌─────────────────────┐
-                 │  Worker             │
-                 │   validate          │
-                 │   extract metadata  │
-                 │   bulk insert       │
-                 └─────────┬───────────┘
-                           ▼
-                 ┌─────────────────────┐
-                 │  Postgres (Prisma)  │
-                 │   Conversation      │
-                 │   ChatMessage       │
-                 │   InferenceEvent    │
-                 │   ExtractedMetadata │
-                 └─────────────────────┘
+Browser ──► Next.js app (producer)
+              │  /api/chat    (streams via @brank/inferhence)
+              │  /api/ingest  (receives SDK events → validate → redact → enqueue)
+              │  /api/metrics (SSE dashboard feed)
+              ▼  publish
+         Queue  (RabbitMQ in prod; in-memory in dev)
+              ▲  consume (micro-batch)
+              │
+         Worker (Bun) ──► Postgres (Prisma, system of record)
+              │
+         Redis  ── opt-in chat history cache (TTL, invalidated on write)
 ```
 
-1. **SDK emit.** `@brank/inferhence` wraps the LLM call and emits lifecycle events — `started`, `first_token`, `progress`, `completed`, `failed`, `cancelled` — through an in-process `EventEmitter`. This is the auto-instrumentation layer; application code does not manually log anything.
-2. **SDK transport.** Each event is delivered to `POST /api/ingest` over HTTP (best-effort, retried `INFERHENCE_RETRIES` times). Multiple transports can be composed (e.g. HTTP + console) without touching call sites.
-3. **Ingest endpoint.** Validates the payload with a zod schema, runs PII redaction on the `previews` field, stamps `receivedAt`/`queuedAt`, and publishes onto the `EventQueue` adapter. The HTTP response returns immediately after enqueue — it never waits for the database write.
-4. **Queue.** The adapter decouples producers from consumers. In dev it is an in-process queue; in production it is RabbitMQ (durable, with a DLQ). The `createQueueAdapter` factory makes swapping to Kafka a one-line change.
-5. **Worker.** Subscribes to the queue, micro-batches messages (`INGESTION_MAX_BATCH_SIZE` / `INGESTION_MAX_BATCH_WAIT_MS`), validates again, extracts structured metadata into `ExtractedMetadata`, and bulk-inserts with `skipDuplicates` for idempotency. It emits rolling pipeline metrics that the app surfaces over SSE.
+<!-- Diagram placeholder: architecture-overview.svg -->
 
-## Logging Strategy
+---
 
-- **Two log streams, intentionally separate.**
-  - *Chat/telemetry logs* are **events**, not log lines. They are structured JSON emitted by the SDK, shipped through the queue, and persisted as `InferenceEvent` rows. This is queryable, joinable data — not text in a file.
-  - *Operational logs* (request IDs, errors, latency of the app itself) use `pino` (with `pino-noir` for redaction) via the `withLogging` wrapper on API routes.
-- **PII redaction happens twice** — at the SDK boundary (before the event leaves the process) and again at the ingestion boundary (before it is queued). Defense in depth so a misconfigured transport can never leak raw previews.
-- **Previews, not full payloads.** We store truncated input/output previews plus token counts, not the entire conversation, keeping `InferenceEvent` rows small and cheap to scan. Full messages live in `ChatMessage`.
-- **Metrics are derived, not stored raw.** The `MetricsAggregator` keeps rolling buckets; the dashboard reads aggregates over SSE rather than hitting the database on every frame.
+## Components
 
-## Scaling Considerations
+### App (Next.js 16, Bun runtime)
 
-- **Horizontal app tier.** `brank-app` replicas are stateless and behind the ingress; RabbitMQ absorbs write pressure so a traffic spike never blocks ingestion.
-- **Horizontal worker tier.** Increase `brank-worker` replicas to fan out queue consumption. Each worker holds its own channel; RabbitMQ round-robins messages. `RABBITMQ_PREFETCH` controls in-flight per worker.
-- **Cache tier.** Redis is opt-in and used only for chat history with TTL; the app is functionally identical without it. At scale move to Redis Cluster / Elasticache for cross-replica consistency.
-- **Metrics tier.** The in-memory aggregator is per-process. For multi-replica or long-window dashboards, implement `ClickHouseMetricsBackend` against the existing `MetricsBackend` interface — no caller changes.
-- **Data tier.** `InferenceEvent` is append-only and grows without bound. Partition by `emittedAt` (time) at high volume and add a retention job; keep hot data in Postgres, cold data in columnar storage if query needs grow.
-- **One-command deploy.** `docker-compose up --build` for local; `helm install brank ./helm/brank` (or `kubectl apply -k k8s/`) for a self-hosted cluster — both scale the same components.
+The app is the **producer** plus the user-facing surface.
 
-## Failure Handling Assumptions
+- **`app/api/chat`** — streams completions via the `ai` v7 SDK, wrapped by `@brank/inferhence`
+  so every request emits a telemetry lifecycle. Provider selection is driven by the
+  multi-provider registry (`packages/providers`), which supports browser-supplied API keys
+  (bring-your-own-key) as well as server-side env keys.
+- **`app/api/ingest`** — the SDK's HTTP transport target. Validates each event (zod),
+  redacts previews a second time, and enqueues it onto the queue.
+- **`app/api/metrics`** — SSE feed of rolling aggregates for the dashboard.
+- **`app/api/conversations`, `models`, `auth`, `health`** — conversation CRUD, model
+  discovery, auth, and liveness/readiness probes.
+- **`lib/`** — app glue: `db.ts`, `auth.ts`/`auth-client.ts` (`better-auth`), `chat-cache.ts`
+  (Redis), `ingestion-service.ts`, `logger.ts` (`pino` + `withLogging` wrapper), `config.ts`.
 
-- **Chat UX is never blocked by telemetry.** If the SDK cannot deliver an event after `INFERHENCE_RETRIES`, it drops the telemetry and continues. Losing a metric is acceptable; losing a chat response is not.
-- **At-least-once ingestion, deduped at write.** Events can be redelivered (worker crash between dequeue and commit). `eventId` is the primary key and inserts use `skipDuplicates`, so replays are idempotent.
-- **Poison messages go to the DLQ.** Failed batches retry up to `INGESTION_MAX_RETRIES`, then are nacked to `brank.inference.dlq`. The queue keeps flowing instead of wedging on one bad payload.
-- **Graceful drain.** The worker pod sets `terminationGracePeriodSeconds: 60` and handles `SIGTERM`/`SIGINT` to flush in-flight batches before exit.
-- **Migration ordering.** The DB migration runs as a Job and must complete (`kubectl wait --for=condition=complete job/...`) before app/worker pods serve traffic, avoiding partial-schema races.
-- **Probes.** App uses HTTP `/api/health` liveness/readiness; infra services (postgres/redis/rabbitmq) use native CLI probes; the worker uses a process-exec liveness probe since it is long-lived and headless.
+### Worker (`packages/ingestion`, Bun)
+
+A standalone process (`worker.ts`) that drains the queue and writes to Postgres. It can also
+run in-process inside Next.js when no broker is configured — same code path, no broker.
+Details in [Worker](#worker).
+
+### Packages
+
+| Package | Responsibility |
+|---------|----------------|
+| `packages/db` | Prisma schema, client generation, pg adapter |
+| `packages/inferhence` | Provider-agnostic, PII-safe telemetry SDK (see its [README](./packages/inferhence/docs/README.md)) |
+| `packages/ingestion` | Worker, queue adapters, prisma store, metrics aggregator |
+| `packages/providers` | Multi-provider registry (incl. OpenAI-compatible / LM Studio) |
+
+---
+
+## Worker
+
+`packages/ingestion/src/worker.ts` is a Bun process that:
+
+- Connects to the queue and consumes `brank.inference.events`, using `RABBITMQ_PREFETCH` as
+  the in-flight limit (RabbitMQ) or an equivalent capacity for the in-memory adapter.
+- Validates each event, extracts structured metadata into `ExtractedMetadata`, and
+  bulk-inserts with `skipDuplicates` (`id` PK) for idempotency — safe under at-least-once
+  delivery.
+- Retries a failed batch up to `INGESTION_MAX_RETRIES`, then nacks to the DLQ so a single
+  poison message can't wedge the queue.
+- Logs queue health every 30s and handles `SIGTERM`/`SIGINT` to flush in-flight batches
+  before exit (graceful drain).
+- Runs in-app when `RABBITMQ_URL` is unset — same code, no broker.
+
+---
+
+## Queue
+
+`createQueueAdapter({ type })` is a factory over the transport, so producers never reference
+a concrete broker:
+
+- **`memory`** — dev/tests, in-process. Default when `RABBITMQ_URL` is unset.
+- **`rabbitmq`** — production: durable queue + dead-letter queue via `amqplib`
+  (`packages/ingestion/src/rabbitmq.ts`).
+- **`kafka`** — documented future branch, not implemented.
+
+Swapping transports is a config change, not a code change.
+
+---
+
+## Worker Batch Updates
+
+Before writing, the worker micro-batches: `INGESTION_MAX_BATCH_SIZE` (default 100) **or**
+`INGESTION_MAX_BATCH_WAIT_MS` (default 250ms), whichever hits first, triggers a single
+`createMany` bulk insert. This collapses thousands of small events into a handful of writes,
+keeping Postgres write pressure flat under chat load. `INGESTION_QUEUE_CAPACITY` bounds
+in-flight buffering to avoid unbounded memory growth.
+
+---
+
+## Data Store (Postgres)
+
+Postgres (Prisma + `@prisma/adapter-pg`) is the **system of record**.
+
+| Table | Purpose |
+|-------|---------|
+| `Conversation` | Thread grouping + title |
+| `ChatMessage` | Full user/assistant messages (sequence, provider, model, request/trace IDs) |
+| `InferenceEvent` | Append-only telemetry — type, status, latency, tokens, redacted previews, raw event |
+| `ExtractedMetadata` | Flexible `namespace`/`key`/`value`/`source` — no schema change per new field |
+
+Indexes are tuned for the hot paths: per-conversation timelines, trace/request lookups, and
+provider/model/status time-series for the dashboard. Auth tables (`User`, `Session`,
+`Account`, `Verification`) are managed by `better-auth`.
+
+**Redis** is a separate, opt-in cache for chat history only — it mirrors `ChatMessage` with
+a TTL and is invalidated on every write. Telemetry never touches Redis.
+
+---
+
+## Logging & PII
+
+Two separate streams:
+
+- **Events, not log lines.** Telemetry is structured JSON persisted as `InferenceEvent`
+  rows — queryable and joinable, not buried in text logs.
+- **Operational logs.** `pino` (JSON) + `pino-pretty` in dev via the `withLogging` route
+  wrapper. No message bodies ever reach the logs.
+
+**Previews** (truncated input/output + token counts) are redacted at **two** boundaries:
+SDK egress (`packages/inferhence/src/redaction.ts`) and ingest. Mandatory by default; raw
+prompts/responses are only emitted if `redaction.allowRaw` is explicitly set, and previews
+can be fully disabled with `previewEnabled: false`.
+
+---
+
+## Metrics
+
+A composable `MetricsBackend` interface (`packages/ingestion/src/metrics-aggregator.ts`)
+backs the current `InMemoryMetricsBackend` (rolling buckets) and a future ClickHouse swap.
+The dashboard reads aggregates over SSE rather than querying Postgres per frame. Delivery is
+best-effort: a dropped metric never blocks a chat response.
+
+<!-- Diagram placeholder: metrics-dashboard.png -->
+
+---
+
+## Scaling & Failure
+
+- **App** replicas are stateless and scale horizontally; the queue absorbs write spikes.
+- **Worker** replicas fan out consumption; more workers = faster drain.
+- **At-least-once** ingestion, deduped at write via `skipDuplicates` on `id`.
+- **DLQ** isolates poison messages.
+- Worker pod uses `terminationGracePeriodSeconds: 60` for a clean drain.
+- **Chat UX is never blocked by telemetry** — dropped events are acceptable, dropped
+  responses are not.
+
+---
+
+## Deploy
+
+### Local (Docker Compose)
+
+`docker-compose up --build` brings up Postgres, Redis, RabbitMQ, runs migrations, and starts
+both the app and the worker. `compose-dev.yml` is the broker-less dev variant.
+
+### Kubernetes (`k8s/`)
+
+`kubectl apply -k k8s/` includes: `app.yaml`, `worker.yaml`, `postgres.yaml`, `redis.yaml`,
+`rabbitmq.yaml`, `ingress.yaml`, `migration-job.yaml`, and `secrets.yaml`. The migration Job
+runs `prisma migrate deploy` before traffic is served.
+
+### Helm (`helm/brank/`)
+
+`helm install brank ./helm/brank` renders the same component set with configurable replicas
+and resources.
+
+All three paths scale the same components: stateless app, fan-out worker, and the brokers.
+
+<!-- Diagram placeholder: deploy-topology.svg -->
