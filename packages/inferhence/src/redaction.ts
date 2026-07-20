@@ -1,4 +1,5 @@
 import redact from "@pinojs/redact";
+import { redactum } from "redactum";
 import type { RedactionOptions, RedactionRule, RedactedPreview } from "./types";
 
 const DEFAULT_MAX_PREVIEW_CHARS = 512;
@@ -36,6 +37,7 @@ const DEFAULT_SENSITIVE_KEYS = [
 export type RedactionResult = {
   value: string;
   redactionCount: number;
+  redactionBreakdown?: Record<string, number>;
   truncated: boolean;
 };
 
@@ -125,27 +127,141 @@ function countRedactedKeys(original: unknown, redacted: unknown): number {
   return count;
 }
 
+export function redactText(text: string, options: RedactionOptions = {}): RedactionResult {
+  const result = redactum(text, {
+    replacement: (match, category) => `[REDACTED:${category.toLowerCase()}]`,
+  });
+
+  const redactionBreakdown: Record<string, number> = {};
+  for (const finding of result.findings) {
+    const cat = finding.category.toLowerCase();
+    redactionBreakdown[cat] = (redactionBreakdown[cat] ?? 0) + 1;
+  }
+
+  let redacted = result.redactedText;
+  let redactionCount = result.findings.length;
+
+  const allRegexRules = [...BUILT_IN_RULES, ...(options.customRules ?? [])];
+  for (const rule of allRegexRules) {
+    let ruleCount = 0;
+    redacted = redacted.replace(rule.pattern, () => {
+      redactionCount += 1;
+      ruleCount += 1;
+      return rule.replacement ?? `[REDACTED:${rule.name}]`;
+    });
+    if (ruleCount > 0) {
+      const key = options.customRules?.includes(rule) ? `custom:${rule.name}` : `builtin:${rule.name}`;
+      redactionBreakdown[key] = ruleCount;
+    }
+  }
+
+  return { value: redacted, redactionCount, redactionBreakdown, truncated: false };
+}
+
+export function redactValue(value: unknown, options: RedactionOptions = {}): RedactionResult {
+  const sensitiveKeys = new Set([...(options.sensitiveKeys ?? []), ...DEFAULT_SENSITIVE_KEYS]);
+  const { value: redacted, redactionCount: keyRedactionCount } = redactKeys(value, sensitiveKeys);
+  let text = stringifyPreview(redacted);
+  let redactionCount = keyRedactionCount;
+
+  const redactionBreakdown: Record<string, number> = {};
+  if (keyRedactionCount > 0) {
+    redactionBreakdown["redacted_key"] = keyRedactionCount;
+  }
+
+  const result = redactum(text, {
+    replacement: (match, category) => `[REDACTED:${category.toLowerCase()}]`,
+  });
+  text = result.redactedText;
+  for (const finding of result.findings) {
+    const cat = finding.category.toLowerCase();
+    redactionBreakdown[cat] = (redactionBreakdown[cat] ?? 0) + 1;
+  }
+  redactionCount += result.findings.length;
+
+  for (const rule of BUILT_IN_RULES) {
+    let ruleCount = 0;
+    text = text.replace(rule.pattern, () => {
+      redactionCount += 1;
+      ruleCount += 1;
+      return rule.replacement ?? `[REDACTED:${rule.name}]`;
+    });
+    if (ruleCount > 0) {
+      redactionBreakdown[`builtin:${rule.name}`] = ruleCount;
+    }
+  }
+
+  for (const rule of options.customRules ?? []) {
+    let ruleCount = 0;
+    text = text.replace(rule.pattern, () => {
+      redactionCount += 1;
+      ruleCount += 1;
+      return rule.replacement ?? `[REDACTED:${rule.name}]`;
+    });
+    if (ruleCount > 0) {
+      redactionBreakdown[`custom:${rule.name}`] = ruleCount;
+    }
+  }
+
+  return { value: text, redactionCount, redactionBreakdown, truncated: false };
+}
+
 export function redactPreview(value: unknown, options: RedactionOptions = {}): RedactionResult {
   if (options.allowRaw) {
-    return truncatePreview(stringifyPreview(value), options.maxPreviewChars);
+    const truncated = truncatePreview(stringifyPreview(value), options.maxPreviewChars);
+    return { ...truncated, redactionBreakdown: undefined };
   }
+
+  const redactionBreakdown: Record<string, number> = {};
 
   const sensitiveKeys = new Set([...(options.sensitiveKeys ?? []), ...DEFAULT_SENSITIVE_KEYS]);
   const { value: normalized, redactionCount: keyRedactionCount } = redactKeys(value, sensitiveKeys);
+  if (keyRedactionCount > 0) {
+    redactionBreakdown["redacted_key"] = keyRedactionCount;
+  }
+
   let text = stringifyPreview(normalized);
   let redactionCount = keyRedactionCount;
 
-  for (const rule of [...BUILT_IN_RULES, ...(options.customRules ?? [])]) {
+  const result = redactum(text, {
+    replacement: (match, category) => `[REDACTED:${category.toLowerCase()}]`,
+  });
+  text = result.redactedText;
+  for (const finding of result.findings) {
+    const cat = finding.category.toLowerCase();
+    redactionBreakdown[cat] = (redactionBreakdown[cat] ?? 0) + 1;
+  }
+  redactionCount += result.findings.length;
+
+  for (const rule of BUILT_IN_RULES) {
+    let ruleCount = 0;
     text = text.replace(rule.pattern, () => {
       redactionCount += 1;
+      ruleCount += 1;
       return rule.replacement ?? `[REDACTED:${rule.name}]`;
     });
+    if (ruleCount > 0) {
+      redactionBreakdown[`builtin:${rule.name}`] = ruleCount;
+    }
+  }
+
+  for (const rule of options.customRules ?? []) {
+    let ruleCount = 0;
+    text = text.replace(rule.pattern, () => {
+      redactionCount += 1;
+      ruleCount += 1;
+      return rule.replacement ?? `[REDACTED:${rule.name}]`;
+    });
+    if (ruleCount > 0) {
+      redactionBreakdown[`custom:${rule.name}`] = ruleCount;
+    }
   }
 
   const truncated = truncatePreview(text, options.maxPreviewChars);
   return {
     value: truncated.value,
     redactionCount: redactionCount + truncated.redactionCount,
+    redactionBreakdown,
     truncated: truncated.truncated,
   };
 }
@@ -159,15 +275,28 @@ export function buildPreviews(
     return { disabled: true, redactionCount: 0, truncated: false };
   }
 
-  const inputPreview = redactPreview(input, options);
-  const outputPreview = redactPreview(output, options);
+  const hasInput = input !== undefined && input !== null;
+  const hasOutput = output !== undefined && output !== null;
+
+  const inputPreview = hasInput ? redactPreview(input, options) : undefined;
+  const outputPreview = hasOutput ? redactPreview(output, options) : undefined;
+
+  const redactionBreakdown: Record<string, number> = {};
+  for (const p of [inputPreview, outputPreview]) {
+    if (p?.redactionBreakdown) {
+      for (const [cat, count] of Object.entries(p.redactionBreakdown)) {
+        redactionBreakdown[cat] = (redactionBreakdown[cat] ?? 0) + count;
+      }
+    }
+  }
 
   return {
-    input: inputPreview.value,
-    output: outputPreview.value,
+    input: inputPreview?.value,
+    output: outputPreview?.value,
     disabled: false,
-    redactionCount: inputPreview.redactionCount + outputPreview.redactionCount,
-    truncated: inputPreview.truncated || outputPreview.truncated,
+    redactionCount: (inputPreview?.redactionCount ?? 0) + (outputPreview?.redactionCount ?? 0),
+    redactionBreakdown: Object.keys(redactionBreakdown).length > 0 ? redactionBreakdown : undefined,
+    truncated: (inputPreview?.truncated ?? false) || (outputPreview?.truncated ?? false),
   };
 }
 
@@ -181,6 +310,115 @@ function truncatePreview(value: string, maxPreviewChars = DEFAULT_MAX_PREVIEW_CH
     redactionCount: 0,
     truncated: true,
   };
+}
+
+export function redactObjectStrings(
+  value: unknown,
+  options: RedactionOptions = {},
+): unknown {
+  if (typeof value === "string") {
+    return redactText(value, options).value;
+  }
+
+  if (Array.isArray(value)) {
+    const results: unknown[] = [];
+    for (const item of value) {
+      results.push(redactObjectStrings(item, options));
+    }
+    return results;
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of entries) {
+      result[key] = redactObjectStrings(val, options);
+    }
+    return result;
+  }
+
+  return value;
+}
+
+async function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+export async function redactStringsDeep(
+  value: unknown,
+  options: RedactionOptions = {},
+): Promise<unknown> {
+  if (typeof value === "string") {
+    const result = await redactTextAsync(value, options);
+    return result.value;
+  }
+
+  if (Array.isArray(value)) {
+    const results: unknown[] = [];
+    for (const item of value) {
+      results.push(await redactStringsDeep(item, options));
+    }
+    return results;
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of entries) {
+      result[key] = await redactStringsDeep(val, options);
+      await yieldToEventLoop();
+    }
+    return result;
+  }
+
+  return value;
+}
+
+export async function redactTextAsync(
+  text: string,
+  options: RedactionOptions = {},
+): Promise<RedactionResult> {
+  const result = redactum(text, {
+    replacement: (match, category) => `[REDACTED:${category.toLowerCase()}]`,
+  });
+  await yieldToEventLoop();
+
+  const redactionBreakdown: Record<string, number> = {};
+  for (const finding of result.findings) {
+    const cat = finding.category.toLowerCase();
+    redactionBreakdown[cat] = (redactionBreakdown[cat] ?? 0) + 1;
+  }
+
+  let redacted = result.redactedText;
+  let redactionCount = result.findings.length;
+
+  for (const rule of BUILT_IN_RULES) {
+    let ruleCount = 0;
+    redacted = redacted.replace(rule.pattern, () => {
+      redactionCount += 1;
+      ruleCount += 1;
+      return rule.replacement ?? `[REDACTED:${rule.name}]`;
+    });
+    if (ruleCount > 0) {
+      redactionBreakdown[`builtin:${rule.name}`] = ruleCount;
+    }
+    await yieldToEventLoop();
+  }
+
+  for (const rule of options.customRules ?? []) {
+    let ruleCount = 0;
+    redacted = redacted.replace(rule.pattern, () => {
+      redactionCount += 1;
+      ruleCount += 1;
+      return rule.replacement ?? `[REDACTED:${rule.name}]`;
+    });
+    if (ruleCount > 0) {
+      redactionBreakdown[`custom:${rule.name}`] = ruleCount;
+    }
+    await yieldToEventLoop();
+  }
+
+  return { value: redacted, redactionCount, redactionBreakdown, truncated: false };
 }
 
 function stringifyPreview(value: unknown): string {

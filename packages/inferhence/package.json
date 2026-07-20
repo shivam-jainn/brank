@@ -10,6 +10,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@pinojs/redact": "^0.4.0"
+    "@pinojs/redact": "^0.4.0",
+    "redactum": "^1.1.0"
   }
 }

@@ -304,6 +304,79 @@ describe("events and wrappers", () => {
   });
 });
 
+describe("buildEvent userId propagation", () => {
+  test("includes userId in ids when provided in metadata", () => {
+    const event = buildEvent({
+      metadata: {
+        ...metadata,
+        userId: "user-123",
+      },
+      input: "hello",
+      startedAtMs: 1_000,
+      sequence: 0,
+      clock: () => 1_100,
+      idFactory: () => "id",
+    }, "completed", { completed: true });
+
+    expect(event.ids.userId).toBe("user-123");
+  });
+
+  test("userId is undefined when not provided in metadata", () => {
+    const event = buildEvent({
+      metadata: {
+        provider: "openai",
+        model: "gpt-test",
+      },
+      input: "hello",
+      startedAtMs: 1_000,
+      sequence: 0,
+      clock: () => 1_100,
+      idFactory: () => "id",
+    }, "completed", { completed: true });
+
+    expect(event.ids.userId).toBeUndefined();
+  });
+
+  test("userId propagates through withInference wrapper", async () => {
+    const transport = createMemoryTransport();
+    await withInference("input", async () => ({ response: "ok" }), {
+      metadata: {
+        ...metadata,
+        userId: "user-456",
+      },
+      transport,
+      clock: clockFactory(1_000, 1_010, 1_100),
+      idFactory: () => "id",
+    });
+
+    expect(transport.events[0].ids.userId).toBe("user-456");
+    expect(transport.events[1].ids.userId).toBe("user-456");
+  });
+
+  test("userId propagates through withStreamingInference", async () => {
+    const transport = createMemoryTransport();
+    async function* stream() {
+      yield "a";
+    }
+
+    for await (const _ of withStreamingInference("input", stream, {
+      metadata: {
+        ...metadata,
+        userId: "user-789",
+      },
+      transport,
+      clock: clockFactory(1_000, 1_001, 1_100),
+      idFactory: () => "id",
+    })) {
+      // consume
+    }
+
+    for (const event of transport.events) {
+      expect(event.ids.userId).toBe("user-789");
+    }
+  });
+});
+
 describe("example integration", () => {
   test("streams fake JSON LLM chunks through HTTP ingestion with redacted previews", async () => {
     type FakeLlmChunk = {
@@ -457,6 +530,255 @@ describe("transports", () => {
     await batcher.send(progress);
     if (batcher.close) await batcher.close();
     expect(batches).toEqual([["started", "progress"]]);
+  });
+});
+
+describe("input/output message differentiation", () => {
+  test("started event has input preview but no output preview", async () => {
+    const transport = createMemoryTransport();
+    await withInference(
+      "user message here",
+      async () => ({ response: "ok", output: "assistant response" }),
+      {
+        metadata,
+        transport,
+        clock: clockFactory(1_000, 1_010, 1_100),
+        idFactory: () => "id",
+      },
+    );
+
+    const started = transport.events[0];
+    expect(started.eventType).toBe("started");
+    expect(started.previews.input).toBeDefined();
+    expect(started.previews.input).toContain("user message here");
+    expect(started.previews.output).toBeUndefined();
+  });
+
+  test("completed event has both input and output previews", async () => {
+    const transport = createMemoryTransport();
+    await withInference(
+      "user message here",
+      async () => ({ response: "ok", output: "assistant response" }),
+      {
+        metadata,
+        transport,
+        clock: clockFactory(1_000, 1_010, 1_100),
+        idFactory: () => "id",
+      },
+    );
+
+    const completed = transport.events[1];
+    expect(completed.eventType).toBe("completed");
+    expect(completed.previews.input).toBeDefined();
+    expect(completed.previews.input).toContain("user message here");
+    expect(completed.previews.output).toBeDefined();
+    expect(completed.previews.output).toContain("assistant response");
+  });
+
+  test("input and output previews are different strings", async () => {
+    const transport = createMemoryTransport();
+    await withInference(
+      { messages: [{ role: "user", content: "What is 2+2?" }] },
+      async () => ({ response: "ok", output: "The answer is 4" }),
+      {
+        metadata,
+        transport,
+        clock: clockFactory(1_000, 1_010, 1_100),
+        idFactory: () => "id",
+      },
+    );
+
+    const completed = transport.events.at(-1)!;
+    expect(completed.previews.input).not.toBe(completed.previews.output);
+    expect(completed.previews.input).toContain("What is 2+2?");
+    expect(completed.previews.output).toContain("The answer is 4");
+  });
+
+  test("streaming started event has input but no output", async () => {
+    const transport = createMemoryTransport();
+    async function* stream() {
+      yield "hello ";
+      yield "world";
+    }
+
+    for await (const _ of withStreamingInference("user prompt", stream, {
+      metadata,
+      transport,
+      clock: clockFactory(1_000, 1_001, 1_002, 1_100),
+      idFactory: () => "id",
+    })) {
+      // consume
+    }
+
+    const started = transport.events[0];
+    expect(started.eventType).toBe("started");
+    expect(started.previews.input).toContain("user prompt");
+    expect(started.previews.output).toBeUndefined();
+  });
+
+  test("streaming first_token event has input and partial output", async () => {
+    const transport = createMemoryTransport();
+    async function* stream() {
+      yield "hello ";
+      yield "world";
+    }
+
+    for await (const _ of withStreamingInference("user prompt", stream, {
+      metadata,
+      transport,
+      clock: clockFactory(1_000, 1_001, 1_002, 1_100),
+      idFactory: () => "id",
+    })) {
+      // consume
+    }
+
+    const firstToken = transport.events[1];
+    expect(firstToken.eventType).toBe("first_token");
+    expect(firstToken.previews.input).toContain("user prompt");
+    expect(firstToken.previews.output).toBeDefined();
+    expect(firstToken.previews.output).toContain("hello ");
+  });
+
+  test("streaming completed event has input and full output", async () => {
+    const transport = createMemoryTransport();
+    async function* stream() {
+      yield "hello ";
+      yield "world";
+    }
+
+    for await (const _ of withStreamingInference("user prompt", stream, {
+      metadata,
+      transport,
+      clock: clockFactory(1_000, 1_001, 1_002, 1_100),
+      idFactory: () => "id",
+    })) {
+      // consume
+    }
+
+    const completed = transport.events.at(-1)!;
+    expect(completed.eventType).toBe("completed");
+    expect(completed.previews.input).toContain("user prompt");
+    expect(completed.previews.output).toContain("hello world");
+  });
+
+  test("failed event preserves input context", async () => {
+    const transport = createMemoryTransport();
+    const failure = new Error("provider down");
+
+    await expect(
+      withInference("important user request", async () => {
+        throw failure;
+      }, {
+        metadata,
+        transport,
+        clock: clockFactory(1_000, 1_010, 1_100),
+        idFactory: () => "id",
+      }),
+    ).rejects.toThrow("provider down");
+
+    const failed = transport.events.at(-1)!;
+    expect(failed.eventType).toBe("failed");
+    expect(failed.previews.input).toContain("important user request");
+    expect(failed.previews.output).toBeUndefined();
+  });
+
+  test("input preview is redacted independently from output preview", async () => {
+    const transport = createMemoryTransport();
+    await withInference(
+      "Contact me at secret@example.com",
+      async () => ({
+        response: "ok",
+        output: "Card on file: 4242 4242 4242 4242",
+      }),
+      {
+        metadata,
+        transport,
+        clock: clockFactory(1_000, 1_010, 1_100),
+        idFactory: () => "id",
+      },
+    );
+
+    const completed = transport.events.at(-1)!;
+    expect(completed.previews.input).not.toContain("secret@example.com");
+    expect(completed.previews.input).toContain("[REDACTED:email]");
+    expect(completed.previews.output).not.toContain("4242 4242 4242 4242");
+    expect(completed.previews.output).toContain("[REDACTED:");
+  });
+
+  test("wrapLanguageModel doGenerate separates input and output", async () => {
+    const transport = createMemoryTransport();
+    const mockModel = {
+      modelId: "mock-model",
+      provider: "mock-provider",
+      async doGenerate(options: any) {
+        return {
+          text: "generated response text",
+          usage: { promptTokens: 5, completionTokens: 10 },
+        };
+      },
+    };
+
+    const wrapped = wrapLanguageModel(mockModel, {
+      metadata: { provider: "mock-provider", model: "mock-model" },
+      transport,
+    });
+
+    await wrapped.doGenerate({ prompt: "test input prompt" });
+
+    const started = transport.events[0];
+    expect(started.eventType).toBe("started");
+    expect(started.previews.input).toContain("test input prompt");
+    expect(started.previews.output).toBeUndefined();
+
+    const completed = transport.events[1];
+    expect(completed.eventType).toBe("completed");
+    expect(completed.previews.input).toContain("test input prompt");
+    expect(completed.previews.output).toContain("generated response text");
+  });
+
+  test("wrapLanguageModel doStream separates input and output", async () => {
+    const transport = createMemoryTransport();
+    const mockModel = {
+      modelId: "mock-model",
+      provider: "mock-provider",
+      async doStream(options: any) {
+        return {
+          stream: new ReadableStream({
+            start(controller) {
+              controller.enqueue({ type: "text-delta", textDelta: "streamed " });
+              controller.enqueue({ type: "text-delta", textDelta: "response" });
+              controller.enqueue({
+                type: "response-metadata",
+                usage: { promptTokens: 5, completionTokens: 10 },
+              });
+              controller.close();
+            },
+          }),
+        };
+      },
+    };
+
+    const wrapped = wrapLanguageModel(mockModel, {
+      metadata: { provider: "mock-provider", model: "mock-model" },
+      transport,
+    });
+
+    const streamResult = await wrapped.doStream({ prompt: "stream input prompt" });
+    const reader = streamResult.stream.getReader();
+    while (true) {
+      const { done } = await reader.read();
+      if (done) break;
+    }
+
+    const started = transport.events[0];
+    expect(started.eventType).toBe("started");
+    expect(started.previews.input).toContain("stream input prompt");
+    expect(started.previews.output).toBeUndefined();
+
+    const completed = transport.events.at(-1)!;
+    expect(completed.eventType).toBe("completed");
+    expect(completed.previews.input).toContain("stream input prompt");
+    expect(completed.previews.output).toContain("streamed response");
   });
 });
 

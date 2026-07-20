@@ -1,4 +1,5 @@
 import { buildEvent, defaultClock, defaultIdFactory } from "./events";
+import { redactStringsDeep, redactTextAsync } from "./redaction";
 import type { ProgressPolicy, TokenUsage, WrapperOptions } from "./types";
 
 export type CompletionResult<T> = {
@@ -17,16 +18,24 @@ export async function withInference<T>(
   const startedAtMs = clock();
   let sequence = 0;
 
-  const emit = async (eventType: Parameters<typeof buildEvent>[1], args = {}) => {
+  const redactedInput = options.redaction
+    ? await redactStringsDeep(input, options.redaction)
+    : input;
+
+  const emit = async (eventType: Parameters<typeof buildEvent>[1], args: Parameters<typeof buildEvent>[2] = {}) => {
+    const redactedOutput = args.output !== undefined && typeof args.output === "string" && options.redaction
+      ? (await redactTextAsync(args.output, options.redaction)).value
+      : args.output;
+
     await options.transport.send(buildEvent({
       metadata: options.metadata,
-      input,
+      input: redactedInput,
       startedAtMs,
       sequence: sequence++,
       clock,
       idFactory,
       redaction: options.redaction,
-    }, eventType, args));
+    }, eventType, { ...args, output: redactedOutput }));
   };
 
   await emit("started");
@@ -34,9 +43,10 @@ export async function withInference<T>(
   try {
     const result = await call(options.signal);
     const normalized = normalizeCompletionResult(result);
+    const output = normalized.output ?? normalized.response;
     await emit("completed", {
-      output: normalized.output ?? normalized.response,
-      usage: withEstimatedUsage(input, normalized.output ?? normalized.response, normalized.usage),
+      output,
+      usage: withEstimatedUsage(redactedInput, output, normalized.usage),
       completed: true,
     });
     return normalized.response;
@@ -69,22 +79,31 @@ export async function* withStreamingInference<TChunk>(
   let tokensSinceProgress = 0;
   let usage: TokenUsage | undefined;
 
-  const emit = async (eventType: Parameters<typeof buildEvent>[1], args = {}) => {
+  const redactedInput = options.redaction
+    ? await redactStringsDeep(input, options.redaction)
+    : input;
+
+  const emit = async (eventType: Parameters<typeof buildEvent>[1], args: Parameters<typeof buildEvent>[2] = {}) => {
+    const redactedOutput = args.output !== undefined && typeof args.output === "string" && options.redaction
+      ? (await redactTextAsync(args.output, options.redaction)).value
+      : args.output;
+
     await options.transport.send(buildEvent({
       metadata: options.metadata,
-      input,
+      input: redactedInput,
       startedAtMs,
       sequence: sequence++,
       clock,
       idFactory,
       redaction: options.redaction,
-    }, eventType, args));
+    }, eventType, { ...args, output: redactedOutput }));
   };
 
   await emit("started");
 
   try {
-    for await (const chunk of streamFactory(options.signal)) {
+    const stream = await streamFactory(options.signal);
+    for await (const chunk of stream) {
       chunks.push(chunk);
       const text = options.chunkToText?.(chunk) ?? String(chunk);
       output += text;
@@ -111,11 +130,11 @@ export async function* withStreamingInference<TChunk>(
       throw new DOMException("The operation was aborted.", "AbortError");
     }
 
-    await emit("completed", { output, usage: withEstimatedUsage(input, output, usage), completed: true });
+    await emit("completed", { output, usage: withEstimatedUsage(redactedInput, output, usage), completed: true });
   } catch (error) {
     await emit(isAbortError(error) || options.signal?.aborted ? "cancelled" : "failed", {
       output,
-      usage: withEstimatedUsage(input, output, usage),
+      usage: withEstimatedUsage(redactedInput, output, usage),
       error,
       completed: true,
     });
@@ -349,16 +368,24 @@ export function wrapLanguageModel(
       const startedAtMs = clock();
       let sequence = 0;
 
-      const emit = async (eventType: Parameters<typeof buildEvent>[1], args = {}) => {
+      const redactedPrompt = wrapperOpts.redaction
+        ? await redactStringsDeep(options.prompt, wrapperOpts.redaction)
+        : options.prompt;
+
+      const emit = async (eventType: Parameters<typeof buildEvent>[1], args: Parameters<typeof buildEvent>[2] = {}) => {
+        const redactedOutput = args.output !== undefined && typeof args.output === "string" && wrapperOpts.redaction
+          ? (await redactTextAsync(args.output, wrapperOpts.redaction)).value
+          : args.output;
+
         await wrapperOpts.transport.send(buildEvent({
           metadata: wrapperOpts.metadata,
-          input: options.prompt,
+          input: redactedPrompt,
           startedAtMs,
           sequence: sequence++,
           clock,
           idFactory,
           redaction: wrapperOpts.redaction,
-        }, eventType, args));
+        }, eventType, { ...args, output: redactedOutput }));
       };
 
       await emit("started");
@@ -391,7 +418,7 @@ export function wrapLanguageModel(
             async flush() {
               await emit("completed", {
                 output: outputText,
-                usage: withEstimatedUsage(options.prompt, outputText, usage),
+                usage: withEstimatedUsage(redactedPrompt, outputText, usage),
                 completed: true,
               });
             },
@@ -448,4 +475,179 @@ function mergeUsage(previous?: TokenUsage, next?: TokenUsage): TokenUsage | unde
     total: next.total ?? previous?.total,
     estimated: next.estimated ?? previous?.estimated,
   };
+}
+
+export function wrapOpenAI<T extends any>(
+  client: T,
+  options: WrapperOptions
+): T {
+  const handler = {
+    get(target: any, prop: string | symbol, receiver: any): any {
+      const val = Reflect.get(target, prop, receiver);
+      if (prop === "chat") {
+        return new Proxy(val, {
+          get(chatTarget, chatProp, chatReceiver) {
+            const chatVal = Reflect.get(chatTarget, chatProp, chatReceiver);
+            if (chatProp === "completions") {
+              return new Proxy(chatVal, {
+                get(completionsTarget, completionsProp, completionsReceiver) {
+                  const completionsVal = Reflect.get(completionsTarget, completionsProp, completionsReceiver);
+                  if (completionsProp === "create") {
+                    return function (body: any, requestOptions?: any) {
+                      const model = body.model || "unknown";
+                      const provider = "openai";
+                      const callOptions = {
+                        ...options,
+                        metadata: {
+                          provider,
+                          model,
+                          operation: "chat.completions",
+                          ...options.metadata,
+                        }
+                      };
+
+                      if (body.stream) {
+                        return withStreamingInference(
+                          body.messages || body.prompt || body,
+                          (signal) => completionsVal.call(completionsTarget, { ...body, ...(signal ? { signal } : {}) }, requestOptions),
+                          {
+                            ...callOptions,
+                            chunkToText: (chunk: any) => chunk.choices?.[0]?.delta?.content || "",
+                            usageFromChunk: (chunk: any) => {
+                              if (chunk.usage) {
+                                return {
+                                  input: chunk.usage.prompt_tokens,
+                                  output: chunk.usage.completion_tokens,
+                                  total: chunk.usage.total_tokens,
+                                };
+                              }
+                              return undefined;
+                            }
+                          }
+                        );
+                      } else {
+                        return withInference(
+                          body.messages || body.prompt || body,
+                          async (signal) => {
+                            const res = await completionsVal.call(completionsTarget, { ...body, ...(signal ? { signal } : {}) }, requestOptions);
+                            const text = res.choices?.[0]?.message?.content || "";
+                            const usage = res.usage ? {
+                              input: res.usage.prompt_tokens,
+                              output: res.usage.completion_tokens,
+                              total: res.usage.total_tokens,
+                            } : undefined;
+                            return {
+                              response: res,
+                              output: text,
+                              usage,
+                            };
+                          },
+                          callOptions
+                        );
+                      }
+                    };
+                  }
+                  return typeof completionsVal === "function" ? completionsVal.bind(completionsTarget) : completionsVal;
+                }
+              });
+            }
+            return typeof chatVal === "function" ? chatVal.bind(chatTarget) : chatVal;
+          }
+        });
+      }
+      return typeof val === "function" ? val.bind(target) : val;
+    }
+  };
+  return new Proxy(client, handler);
+}
+
+export function wrapAnthropic<T extends any>(
+  client: T,
+  options: WrapperOptions
+): T {
+  const handler = {
+    get(target: any, prop: string | symbol, receiver: any): any {
+      const val = Reflect.get(target, prop, receiver);
+      if (prop === "messages") {
+        return new Proxy(val, {
+          get(messagesTarget, messagesProp, messagesReceiver) {
+            const messagesVal = Reflect.get(messagesTarget, messagesProp, messagesReceiver);
+            if (messagesProp === "create") {
+              return function (body: any, requestOptions?: any) {
+                const model = body.model || "unknown";
+                const provider = "anthropic";
+                const callOptions = {
+                  ...options,
+                  metadata: {
+                    provider,
+                    model,
+                    operation: "messages.create",
+                    ...options.metadata,
+                  }
+                };
+
+                if (body.stream) {
+                  return withStreamingInference(
+                    body.messages || body,
+                    (signal) => messagesVal.call(messagesTarget, { ...body, ...(signal ? { signal } : {}) }, requestOptions),
+                    {
+                      ...callOptions,
+                      chunkToText: (chunk: any) => {
+                        if (chunk.type === "content_block_delta" && chunk.delta?.text) {
+                          return chunk.delta.text;
+                        }
+                        if (chunk.type === "content_block_start" && chunk.content_block?.text) {
+                          return chunk.content_block.text;
+                        }
+                        return "";
+                      },
+                      usageFromChunk: (chunk: any) => {
+                        if (chunk.message?.usage) {
+                          return {
+                            input: chunk.message.usage.input_tokens,
+                            output: chunk.message.usage.output_tokens,
+                            total: chunk.message.usage.input_tokens + chunk.message.usage.output_tokens,
+                          };
+                        }
+                        if (chunk.usage) {
+                          return {
+                            input: chunk.usage.input_tokens,
+                            output: chunk.usage.output_tokens,
+                            total: chunk.usage.input_tokens + chunk.usage.output_tokens,
+                          };
+                        }
+                        return undefined;
+                      }
+                    }
+                  );
+                } else {
+                  return withInference(
+                    body.messages || body,
+                    async (signal) => {
+                      const res = await messagesVal.call(messagesTarget, { ...body, ...(signal ? { signal } : {}) }, requestOptions);
+                      const text = res.content?.[0]?.text || "";
+                      const usage = res.usage ? {
+                        input: res.usage.input_tokens,
+                        output: res.usage.output_tokens,
+                        total: res.usage.input_tokens + res.usage.output_tokens,
+                      } : undefined;
+                      return {
+                        response: res,
+                        output: text,
+                        usage,
+                      };
+                    },
+                    callOptions
+                  );
+                }
+              };
+            }
+            return typeof messagesVal === "function" ? messagesVal.bind(messagesTarget) : messagesVal;
+          }
+        });
+      }
+      return typeof val === "function" ? val.bind(target) : val;
+    }
+  };
+  return new Proxy(client, handler);
 }
