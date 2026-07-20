@@ -5,6 +5,7 @@ import { invalidateConversationCache } from "@/lib/chat-cache";
 type PersistChatRequestOptions = {
   conversationId: string;
   sessionId?: string;
+  userId?: string;
   requestId: string;
   traceId: string;
   provider: string;
@@ -29,6 +30,7 @@ type MessagePersistenceInput = {
 export async function persistChatRequest({
   conversationId,
   sessionId,
+  userId,
   requestId,
   traceId,
   provider,
@@ -46,12 +48,25 @@ export async function persistChatRequest({
       create: {
         id: conversationId,
         sessionId,
+        userId,
         title: inferTitle(messages),
       },
-      update: {
-        sessionId,
-      },
+      update: {},
     });
+
+    if (sessionId) {
+      await tx.conversation.updateMany({
+        where: { id: conversationId, sessionId: null },
+        data: { sessionId },
+      });
+    }
+
+    if (userId) {
+      await tx.conversation.updateMany({
+        where: { id: conversationId, userId: null },
+        data: { userId },
+      });
+    }
 
     await appendChatMessages(tx, {
       conversationId,
@@ -70,6 +85,7 @@ export async function persistChatRequest({
 export async function persistChatResponse({
   conversationId,
   sessionId,
+  userId,
   requestId,
   traceId,
   provider,
@@ -87,12 +103,25 @@ export async function persistChatResponse({
       create: {
         id: conversationId,
         sessionId,
+        userId,
         title: inferTitle([message]),
       },
-      update: {
-        sessionId,
-      },
+      update: {},
     });
+
+    if (sessionId) {
+      await tx.conversation.updateMany({
+        where: { id: conversationId, sessionId: null },
+        data: { sessionId },
+      });
+    }
+
+    if (userId) {
+      await tx.conversation.updateMany({
+        where: { id: conversationId, userId: null },
+        data: { userId },
+      });
+    }
 
     await appendChatMessages(tx, {
       conversationId,
@@ -203,6 +232,27 @@ function inferTitle(messages: UIMessage[]): string | undefined {
   const text = firstUserText ? extractText(firstUserText).trim() : "";
   if (!text) return undefined;
   return text.length > 80 ? `${text.slice(0, 77)}...` : text;
+}
+
+export async function getChatMessagesByConversation(
+  conversationId: string
+): Promise<Array<{ id: string; role: string; content: string; sequence: number; createdAt: Date }>> {
+  const prisma = getPrismaClient();
+  if (!prisma) return [];
+
+  const messages = await prisma.chatMessage.findMany({
+    where: { conversationId },
+    orderBy: { sequence: "asc" },
+    select: {
+      id: true,
+      role: true,
+      content: true,
+      sequence: true,
+      createdAt: true,
+    },
+  });
+
+  return messages;
 }
 
 function extractText(message: UIMessage): string {

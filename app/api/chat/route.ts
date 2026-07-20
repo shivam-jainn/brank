@@ -12,11 +12,13 @@ import { getInferenceTransport, usageFromAiSdk } from '@/lib/inferhence';
 import { persistChatRequest, persistChatResponse } from '@/lib/chat-storage';
 import { withReadableStreamingInference } from '@brank/inferhence';
 import { appConfig } from '@/lib/config';
+import { auth } from '@/lib/auth';
 import { buildEvent, normalizeMetadata, type InferenceEventType, type TokenUsage } from '@brank/inferhence';
 
 function emitInferenceEvent(
     eventType: InferenceEventType,
     args: {
+        input?: unknown;
         output?: unknown;
         usage?: TokenUsage;
         error?: unknown;
@@ -28,7 +30,7 @@ function emitInferenceEvent(
     void transport.send(buildEvent(
         {
             metadata,
-            input: undefined,
+            input: args.input,
             startedAtMs: Date.now(),
             sequence: 0,
             clock: () => Date.now(),
@@ -53,9 +55,15 @@ export const POST = withLogging(async function POST(req: Request) {    const { m
         crypto.randomUUID();
     const requestId = req.headers.get('x-request-id') ?? traceId;
 
+    const session = auth.api?.getSession
+      ? await auth.api.getSession({ headers: req.headers }).catch(() => null)
+      : null;
+    const userId = session?.user?.id;
+
     await persistChatRequest({
         conversationId,
         sessionId,
+        userId,
         requestId,
         traceId,
         provider,
@@ -80,6 +88,7 @@ export const POST = withLogging(async function POST(req: Request) {    const { m
                 operation: 'chat.stream',
                 conversationId,
                 sessionId,
+                userId,
                 traceId,
                 requestId,
                 attributes: {
@@ -114,6 +123,7 @@ export const POST = withLogging(async function POST(req: Request) {    const { m
         await persistChatResponse({
             conversationId,
             sessionId,
+            userId,
             requestId,
             traceId,
             provider,
@@ -138,6 +148,7 @@ export const POST = withLogging(async function POST(req: Request) {    const { m
         operation: 'chat.stream',
         conversationId,
         sessionId,
+        userId,
         traceId,
         requestId,
         attributes: { route: '/api/chat' },
@@ -160,7 +171,7 @@ export const POST = withLogging(async function POST(req: Request) {    const { m
             if (streamError) {
                 emitInferenceEvent(
                     'failed',
-                    { error: streamError, completed: true },
+                    { input: { messages, model: modelId }, error: streamError, completed: true },
                     inferenceMetadata,
                 );
             }
