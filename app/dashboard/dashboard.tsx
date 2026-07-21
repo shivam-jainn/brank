@@ -1,6 +1,14 @@
 "use client";
 
 import {
+  ChartConfig,
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import {
   ActivityIcon,
   AlertTriangleIcon,
   Check,
@@ -17,18 +25,7 @@ import {
   X
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { AppSidebar } from "../components/app-sidebar";
-import { FilterBar } from "./components/filter-bar";
-import { ProviderMetricsList } from "./components/provider-metrics-list";
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from "@/components/ui/chart";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -38,6 +35,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { AppSidebar } from "../components/app-sidebar";
+import { FilterBar } from "./components/filter-bar";
+import { ProviderMetricsList } from "./components/provider-metrics-list";
 
 type TimePoint = {
   timestamp: string;
@@ -325,6 +325,7 @@ export function Dashboard() {
                 <Stat label="Cancelled streams" value={(metrics?.totals.cancelledRuns ?? 0).toLocaleString()} detail={`${formatPercent(metrics?.totals.cancellationRate)} cancellation rate`} icon={<SquareIcon className="size-4" />} intent="warn" />
                 <Stat label="Failed calls" value={(metrics?.totals.failedRuns ?? 0).toLocaleString()} detail={`${formatPercent(metrics?.totals.errorRate)} error rate`} icon={<AlertTriangleIcon className="size-4" />} intent="bad" />
                 <Stat label="PII redacted" value={(metrics?.pii.totalRedactions ?? 0).toLocaleString()} detail={`${(metrics?.pii.redactedRuns ?? 0).toLocaleString()} runs · ${formatPercent(metrics?.pii.redactionRate)} redaction rate`} icon={<ShieldAlertIcon className="size-4" />} intent="warn" />
+                <Stat label="Cancelled streams per chat messages" value={metrics?.totals.totalMessages !== null ? ((metrics?.totals.cancelledRuns ?? 0) / metrics?.totals.totalMessages).toLocaleString() : "0"} detail={`${formatPercent(metrics?.totals.cancellationRate)} cancellation rate`} icon={<SquareIcon className="size-4" />} intent="warn" />
               </section>
 
 
@@ -869,9 +870,9 @@ function ChatSpanList({
                             req.status === "failed" ? "bg-[#ff6b57]" :
                             req.status === "cancelled" ? "bg-[#ffbf69]" :
                             "bg-[#7db1ff] animate-pulse"
-                          }`} 
+                          }`}
                         />
-                        
+
                         <div className="flex-1 flex flex-col py-3 px-4 gap-2 min-w-0 overflow-hidden">
                            {/* User msg row */}
                            <div className="flex items-start gap-3 min-w-0">
@@ -882,7 +883,7 @@ function ChatSpanList({
                                {userMsg?.content || <span className="text-[#555] italic">Empty message</span>}
                              </p>
                            </div>
-                           
+
                            {/* Assistant msg row */}
                            <div className="flex items-start gap-3 min-w-0">
                              <div className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded bg-[#74a742]/10 ring-1 ring-[#74a742]/20">
